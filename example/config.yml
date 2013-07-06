@@ -1,0 +1,29 @@
+# environment variables
+environment: GO_ENV     # defaults to development
+config_file: GO_CONFIG  # defaults to ./config/config.yaml
+shard: GO_SHARD
+
+development:
+    log_file: ./log/rqueue.log
+    redis:
+        db: 9
+
+testing:
+    log_file: ./log/rqueue.log
+    redis:
+        port: 63791
+
+staging:
+    log_file: /var/log/rqueue/rqueue.log
+
+production:
+    log_file: /var/log/rqueue/rqueue.log
+    redis:
+        port: 63791
+
+defaults:
+    log_file: ./log/rqueue.log
+    redis:
+        host: localhost
+        port: 6379
+        db: 9
