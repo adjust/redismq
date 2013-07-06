@@ -8,6 +8,11 @@ development:
     redis:
         db: 9
 
+gotesting:
+    log_file: ./log/rqueue.log
+    redis:
+        db: 9
+
 testing:
     log_file: ./log/rqueue.log
     redis:

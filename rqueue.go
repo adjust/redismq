@@ -26,12 +26,39 @@ func (queue *Queue) Put(payload string) error {
 }
 
 func (queue *Queue) Get(consumer string) (*Package, error) {
-	l := queue.redisClient.LLen(WorkingQueueName(queue, consumer))
-	if l.Val() != 0 {
+	if queue.HasUnacked(consumer) {
 		return nil, fmt.Errorf("unacked Packages found!")
 	}
 	answer := queue.redisClient.BRPopLPush(InputQueueName(queue), WorkingQueueName(queue, consumer), 0)
 	return UnmarshalPackage(answer.Val(), queue, consumer), answer.Err()
+}
+
+func (queue *Queue) HasUnacked(consumer string) bool {
+	l := queue.redisClient.LLen(WorkingQueueName(queue, consumer))
+	if l.Val() != 0 {
+		return true
+	}
+	return false
+}
+
+func (queue *Queue) InputLength() int64 {
+	l := queue.redisClient.LLen(InputQueueName(queue))
+	return l.Val()
+}
+
+func (queue *Queue) ResetInput() error {
+	answer := queue.redisClient.Del(InputQueueName(queue))
+	return answer.Err()
+}
+
+func (queue *Queue) ResetFailed() error {
+	answer := queue.redisClient.Del(FailedQueueName(queue))
+	return answer.Err()
+}
+
+func (queue *Queue) ResetWorking(consumer string) error {
+	answer := queue.redisClient.Del(WorkingQueueName(queue, consumer))
+	return answer.Err()
 }
 
 // func (queue *Queue) GetUnAcked(consumer string) *Package {
