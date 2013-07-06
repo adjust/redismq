@@ -37,15 +37,15 @@ func (p *Package) GetString() string {
 }
 
 func (p *Package) Ack() error {
-	err := p.Queue.Ack(p)
+	err := p.Queue.AckPackage(p)
 	return err
 }
 
 func (p *Package) Reject(requeue bool) error {
 	if !requeue {
-		err := p.Queue.Fail(p)
+		err := p.Queue.FailPackage(p)
 		return err
 	}
-	err := p.Queue.Requeue(p)
+	err := p.Queue.RequeuePackage(p)
 	return err
 }

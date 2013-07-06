@@ -48,6 +48,18 @@ func (queue *Queue) HasUnacked(consumer string) bool {
 	return false
 }
 
+func (queue *Queue) RequeueFailed() error {
+	l := queue.FailedLength()
+	for l > 0 {
+		answer := queue.redisClient.RPopLPush(FailedQueueName(queue), InputQueueName(queue))
+		if answer.Err() != nil {
+			return answer.Err()
+		}
+		l--
+	}
+	return nil
+}
+
 func (queue *Queue) InputLength() int64 {
 	l := queue.redisClient.LLen(InputQueueName(queue))
 	return l.Val()
@@ -78,21 +90,17 @@ func (queue *Queue) ResetWorking(consumer string) error {
 	return answer.Err()
 }
 
-// func (queue *Queue) GetUnAcked(consumer string) *Package {
-// 	//TODO
-// }
-
-func (queue *Queue) Ack(p *Package) error {
+func (queue *Queue) AckPackage(p *Package) error {
 	answer := queue.redisClient.RPop(WorkingQueueName(queue, p.Consumer))
 	return answer.Err()
 }
 
-func (queue *Queue) Requeue(p *Package) error {
+func (queue *Queue) RequeuePackage(p *Package) error {
 	answer := queue.redisClient.RPopLPush(WorkingQueueName(queue, p.Consumer), InputQueueName(queue))
 	return answer.Err()
 }
 
-func (queue *Queue) Fail(p *Package) error {
+func (queue *Queue) FailPackage(p *Package) error {
 	answer := queue.redisClient.RPopLPush(WorkingQueueName(queue, p.Consumer), FailedQueueName(queue))
 	return answer.Err()
 }

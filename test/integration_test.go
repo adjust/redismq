@@ -135,10 +135,26 @@ func (suite *TestSuite) TestUnacked(c *C) {
 }
 
 //should requeue failed
+func (suite *TestSuite) TestRequeueFailed(c *C) {
+	for i := 0; i < 100; i++ {
+		c.Check(suite.queue.Put("testpayload"), Equals, nil)
+	}
+	for i := 0; i < 100; i++ {
+		p, err := suite.queue.Get(suite.consumer)
+		c.Check(err, Equals, nil)
+		c.Check(p.Reject(false), Equals, nil)
+	}
+	c.Check(suite.queue.FailedLength(), Equals, int64(100))
+	c.Check(suite.queue.RequeueFailed(), Equals, nil)
+	c.Check(suite.queue.FailedLength(), Equals, int64(0))
+	c.Check(suite.queue.InputLength(), Equals, int64(100))
+}
 
 //should get failed
 
 //should handle multiple queues
+
+//should handle huge payloads
 
 //should get length of input queue
 
