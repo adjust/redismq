@@ -30,7 +30,7 @@ func (queue *Queue) Get(consumer string) (*Package, error) {
 		return nil, fmt.Errorf("unacked Packages found!")
 	}
 	answer := queue.redisClient.BRPopLPush(InputQueueName(queue), WorkingQueueName(queue, consumer), 0)
-	return UnmarshalPackage(answer.Val(), queue, consumer), answer.Err()
+	return queue.parseRedisAnswer(answer, consumer)
 }
 
 func (queue *Queue) GetUnacked(consumer string) (*Package, error) {
@@ -38,7 +38,12 @@ func (queue *Queue) GetUnacked(consumer string) (*Package, error) {
 		return nil, fmt.Errorf("no unacked Packages found!")
 	}
 	answer := queue.redisClient.LIndex(WorkingQueueName(queue, consumer), -1)
-	return UnmarshalPackage(answer.Val(), queue, consumer), answer.Err()
+	return queue.parseRedisAnswer(answer, consumer)
+}
+
+func (queue *Queue) GetFailed(consumer string) (*Package, error) {
+	answer := queue.redisClient.RPopLPush(FailedQueueName(queue), WorkingQueueName(queue, consumer))
+	return queue.parseRedisAnswer(answer, consumer)
 }
 
 func (queue *Queue) HasUnacked(consumer string) bool {
@@ -103,4 +108,15 @@ func (queue *Queue) RequeuePackage(p *Package) error {
 func (queue *Queue) FailPackage(p *Package) error {
 	answer := queue.redisClient.RPopLPush(WorkingQueueName(queue, p.Consumer), FailedQueueName(queue))
 	return answer.Err()
+}
+
+func (queue *Queue) parseRedisAnswer(answer *redis.StringReq, consumer string) (*Package, error) {
+	if answer.Err() != nil {
+		return nil, answer.Err()
+	}
+	p, err := UnmarshalPackage(answer.Val(), queue, consumer)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
 }

@@ -15,14 +15,13 @@ type Package struct {
 	//TODO add Headers or smth. when needed
 }
 
-func UnmarshalPackage(input string, queue *Queue, consumer string) *Package {
+func UnmarshalPackage(input string, queue *Queue, consumer string) (*Package, error) {
 	p := &Package{Queue: queue, Consumer: consumer}
 	err := json.Unmarshal([]byte(input), p)
 	if err != nil {
-		//TODO error handling
-		panic(err)
+		return nil, err
 	}
-	return p
+	return p, nil
 }
 
 func (p *Package) GetString() string {

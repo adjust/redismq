@@ -116,7 +116,7 @@ func (suite *TestSuite) TestFailed(c *C) {
 }
 
 //should get unacked package(s)
-func (suite *TestSuite) TestUnacked(c *C) {
+func (suite *TestSuite) TestGetUnacked(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 
 	_, err := suite.queue.Get(suite.consumer)
@@ -151,6 +151,25 @@ func (suite *TestSuite) TestRequeueFailed(c *C) {
 }
 
 //should get failed
+func (suite *TestSuite) TestGetFailed(c *C) {
+	c.Check(suite.queue.Put("testpayload"), Equals, nil)
+
+	p, err := suite.queue.Get(suite.consumer)
+	c.Check(err, Equals, nil)
+	c.Check(p.Reject(false), Equals, nil)
+	c.Check(suite.queue.FailedLength(), Equals, int64(1))
+
+	p2, err := suite.queue.GetFailed(suite.consumer)
+	c.Check(err, Equals, nil)
+	c.Check(p2.Payload, Equals, "testpayload")
+	c.Check(p2.Ack(), Equals, nil)
+	c.Check(suite.queue.FailedLength(), Equals, int64(0))
+	c.Check(suite.queue.InputLength(), Equals, int64(0))
+
+	//try getting smth from empty failed queue
+	_, err = suite.queue.GetFailed(suite.consumer)
+	c.Check(err, Not(Equals), nil)
+}
 
 //should handle multiple queues
 
