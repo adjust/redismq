@@ -27,6 +27,7 @@ func (suite *TestSuite) SetUpTest(c *C) {
 	suite.queue.ResetInput()
 	suite.queue.ResetFailed()
 	suite.queue.ResetWorking(suite.consumer)
+	suite.queue.ResetWorking(suite.consumer + "2")
 }
 
 //should put package into queue
@@ -35,8 +36,7 @@ func (suite *TestSuite) TestPutGetAndAck(c *C) {
 	p, err := suite.queue.Get(suite.consumer)
 	c.Check(err, Equals, nil)
 	c.Check(p.Payload, Equals, "testpayload")
-	err = p.Ack()
-	c.Check(err, Equals, nil)
+	c.Check(p.Ack(), Equals, nil)
 	c.Check(suite.queue.HasUnacked(suite.consumer), Equals, false)
 }
 
@@ -92,10 +92,47 @@ func (suite *TestSuite) TestSecondConsumer(c *C) {
 }
 
 //should reject package to requeue
+func (suite *TestSuite) TestRequeue(c *C) {
+	c.Check(suite.queue.Put("testpayload"), Equals, nil)
+
+	p, err := suite.queue.Get(suite.consumer)
+	c.Check(err, Equals, nil)
+	c.Check(p.Reject(true), Equals, nil)
+
+	p2, err2 := suite.queue.Get(suite.consumer)
+	c.Check(err2, Equals, nil)
+	c.Check(p2.Payload, Equals, "testpayload")
+}
 
 //should reject package to failed
+func (suite *TestSuite) TestFailed(c *C) {
+	c.Check(suite.queue.Put("testpayload"), Equals, nil)
+
+	p, err := suite.queue.Get(suite.consumer)
+	c.Check(err, Equals, nil)
+	c.Check(p.Reject(false), Equals, nil)
+
+	c.Check(suite.queue.FailedLength(), Equals, int64(1))
+}
 
 //should get unacked package(s)
+func (suite *TestSuite) TestUnacked(c *C) {
+	c.Check(suite.queue.Put("testpayload"), Equals, nil)
+
+	_, err := suite.queue.Get(suite.consumer)
+	c.Check(err, Equals, nil)
+	//Assume that consumer crashed and receives err on get
+
+	_, err = suite.queue.Get(suite.consumer)
+	c.Check(err, Not(Equals), nil)
+
+	p, err := suite.queue.GetUnacked(suite.consumer)
+	c.Check(err, Equals, nil)
+	c.Check(p.Payload, Equals, "testpayload")
+	c.Check(p.Ack(), Equals, nil)
+
+	c.Check(suite.queue.UnackedLength(suite.consumer), Equals, int64(0))
+}
 
 //should requeue failed
 

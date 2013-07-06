@@ -33,9 +33,16 @@ func (queue *Queue) Get(consumer string) (*Package, error) {
 	return UnmarshalPackage(answer.Val(), queue, consumer), answer.Err()
 }
 
+func (queue *Queue) GetUnacked(consumer string) (*Package, error) {
+	if !queue.HasUnacked(consumer) {
+		return nil, fmt.Errorf("no unacked Packages found!")
+	}
+	answer := queue.redisClient.LIndex(WorkingQueueName(queue, consumer), -1)
+	return UnmarshalPackage(answer.Val(), queue, consumer), answer.Err()
+}
+
 func (queue *Queue) HasUnacked(consumer string) bool {
-	l := queue.redisClient.LLen(WorkingQueueName(queue, consumer))
-	if l.Val() != 0 {
+	if queue.UnackedLength(consumer) != 0 {
 		return true
 	}
 	return false
@@ -43,6 +50,16 @@ func (queue *Queue) HasUnacked(consumer string) bool {
 
 func (queue *Queue) InputLength() int64 {
 	l := queue.redisClient.LLen(InputQueueName(queue))
+	return l.Val()
+}
+
+func (queue *Queue) FailedLength() int64 {
+	l := queue.redisClient.LLen(FailedQueueName(queue))
+	return l.Val()
+}
+
+func (queue *Queue) UnackedLength(consumer string) int64 {
+	l := queue.redisClient.LLen(WorkingQueueName(queue, consumer))
 	return l.Val()
 }
 
