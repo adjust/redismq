@@ -24,7 +24,7 @@ type TestSuite struct {
 var _ = Suite(&TestSuite{})
 
 func (suite *TestSuite) SetUpSuite(c *C) {
-	runtime.GOMAXPROCS(4)
+	runtime.GOMAXPROCS(8)
 	rand.Seed(time.Now().UTC().UnixNano())
 	suite.goenv = goenv.NewGoenv("../example/config.yml", "gotesting", "../example/log/test.log")
 	suite.queue = rqueue.NewQueue(suite.goenv, "teststuff")
@@ -264,7 +264,6 @@ func (suite *TestSuite) BenchmarkSingleCon4k(c *C) {
 
 //benchmark four publishers 1k payload
 func (suite *TestSuite) BenchmarkFourPub1k(c *C) {
-	//1KB payload
 	var wg sync.WaitGroup
 	payload := randomString(1024)
 	for i := 0; i < c.N; i++ {
@@ -302,7 +301,6 @@ func (suite *TestSuite) BenchmarkFourCon1k(c *C) {
 
 //benchmark four publisher 4k payload
 func (suite *TestSuite) BenchmarkFourPub4k(c *C) {
-	//1KB payload
 	var wg sync.WaitGroup
 	payload := randomString(1024 * 4)
 	for i := 0; i < c.N; i++ {
@@ -340,7 +338,6 @@ func (suite *TestSuite) BenchmarkFourCon4k(c *C) {
 
 //benchmark single publisher and single consumer 1k payload
 func (suite *TestSuite) BenchmarkSingPubSingCon1k(c *C) {
-	//1KB payload
 	var wg sync.WaitGroup
 	payload := randomString(1024)
 	//add first package so consumer doesn't wait for publisher
@@ -362,10 +359,74 @@ func (suite *TestSuite) BenchmarkSingPubSingCon1k(c *C) {
 }
 
 //benchmark single publisher and single consumer 4k payload
+func (suite *TestSuite) BenchmarkSingPubSingCon4k(c *C) {
+	var wg sync.WaitGroup
+	payload := randomString(1024 * 4)
+	//add first package so consumer doesn't wait for publisher
+	suite.queue.Put(payload)
+	for i := 0; i < c.N; i++ {
+		wg.Add(1)
+		go func() {
+			suite.queue.Put(payload)
+			defer wg.Done()
+		}()
+		wg.Add(1)
+		go func() {
+			p, _ := suite.queue.Get(suite.consumer)
+			p.Ack()
+			defer wg.Done()
+		}()
+		wg.Wait()
+	}
+}
 
 //benchmark four publisher and four consumers 1k payload
+func (suite *TestSuite) BenchmarkFourPubFourCon1k(c *C) {
+	var wg sync.WaitGroup
+	payload := randomString(1024)
+	//add first package so consumer doesn't wait for publisher
+	suite.queue.Put(payload)
+	for i := 0; i < c.N; i++ {
+		for j := 0; j < 4; j++ {
+			wg.Add(1)
+			go func() {
+				suite.queue.Put(payload)
+				defer wg.Done()
+			}()
+			wg.Add(1)
+			go func(j int) {
+				p, _ := suite.queue.Get(suite.consumer + strconv.Itoa(j) + strconv.Itoa(i))
+				p.Ack()
+				defer wg.Done()
+			}(j)
+		}
+		wg.Wait()
+	}
+}
 
 //benchmark four publisher and four consumers 4k payload
+func (suite *TestSuite) BenchmarkFourPubFourCon4k(c *C) {
+	var wg sync.WaitGroup
+	payload := randomString(1024 * 4)
+	//add first package so consumer doesn't wait for publisher
+	suite.queue.Put(payload)
+	for i := 0; i < c.N; i++ {
+		for j := 0; j < 4; j++ {
+			wg.Add(1)
+			go func() {
+				suite.queue.Put(payload)
+				defer wg.Done()
+			}()
+			wg.Add(1)
+			go func(j int) {
+				p, _ := suite.queue.Get(suite.consumer + strconv.Itoa(j) + strconv.Itoa(i))
+				p.Ack()
+				defer wg.Done()
+			}(j)
+		}
+		wg.Wait()
+	}
+}
 
 func randomString(l int) string {
 	bytes := make([]byte, l)
