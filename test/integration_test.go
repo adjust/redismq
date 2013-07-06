@@ -4,6 +4,7 @@ import (
 	"github.com/adeven/goenv"
 	"github.com/adeven/rqueue"
 	. "github.com/matttproud/gocheck"
+	"math/rand"
 	"testing"
 	"time"
 )
@@ -11,6 +12,7 @@ import (
 func Test(t *testing.T) { TestingT(t) }
 
 type TestSuite struct {
+	goenv    *goenv.Goenv
 	queue    *rqueue.Queue
 	consumer string
 }
@@ -18,8 +20,9 @@ type TestSuite struct {
 var _ = Suite(&TestSuite{})
 
 func (suite *TestSuite) SetUpSuite(c *C) {
-	goenv := goenv.NewGoenv("../example/config.yml", "gotesting", "../example/log/test.log")
-	suite.queue = rqueue.NewQueue(goenv, "teststuff")
+	rand.Seed(time.Now().UTC().UnixNano())
+	suite.goenv = goenv.NewGoenv("../example/config.yml", "gotesting", "../example/log/test.log")
+	suite.queue = rqueue.NewQueue(suite.goenv, "teststuff")
 	suite.consumer = "testconsumer"
 }
 
@@ -172,13 +175,38 @@ func (suite *TestSuite) TestGetFailed(c *C) {
 }
 
 //should handle multiple queues
+func (suite *TestSuite) TestSecondQueue(c *C) {
+	secondQueue := rqueue.NewQueue(suite.goenv, "teststuff2")
+	c.Check(suite.queue.Put("testpayload"), Equals, nil)
+	c.Check(secondQueue.Put("testpayload2"), Equals, nil)
+
+	p, err := suite.queue.Get(suite.consumer)
+	c.Check(err, Equals, nil)
+	c.Check(p.Payload, Equals, "testpayload")
+
+	p2, err := secondQueue.Get(suite.consumer)
+	c.Check(err, Equals, nil)
+	c.Check(p2.Payload, Equals, "testpayload2")
+
+	secondQueue.ResetInput()
+	secondQueue.ResetFailed()
+	secondQueue.ResetWorking(suite.consumer)
+}
 
 //should handle huge payloads
+func (suite *TestSuite) TestHugePayload(c *C) {
+	//10MB payload
+	payload := randomString(1024 * 1024 * 10)
 
-//should get length of input queue
+	c.Check(suite.queue.Put(payload), Equals, nil)
+	p, err := suite.queue.Get(suite.consumer)
+	c.Check(err, Equals, nil)
+	c.Check(p.Payload, Equals, payload)
+	c.Check(p.Ack(), Equals, nil)
+	c.Check(suite.queue.HasUnacked(suite.consumer), Equals, false)
+}
 
-//should get length of failed queue
-
+//TODO write stats watcher
 //should get numbers of consumers
 
 //should get publish rate for input
@@ -188,8 +216,22 @@ func (suite *TestSuite) TestGetFailed(c *C) {
 //should get consume rate for consumer
 
 //benchmark single publisher 1k payload
+func (suite *TestSuite) BenchmarkSinglePub1k(c *C) {
+	//1KB payload
+	payload := randomString(1024)
+	for i := 0; i < c.N; i++ {
+		suite.queue.Put(payload)
+	}
+}
 
 //benchmark single publisher 4k payload
+func (suite *TestSuite) BenchmarkSinglePub4k(c *C) {
+	//1KB payload
+	payload := randomString(1024 * 4)
+	for i := 0; i < c.N; i++ {
+		suite.queue.Put(payload)
+	}
+}
 
 //benchmark four publishers 1k payload
 
@@ -202,3 +244,15 @@ func (suite *TestSuite) TestGetFailed(c *C) {
 //benchmark four publisher and four consumers 1k payload
 
 //benchmark four publisher and four consumers 4k payload
+
+func randomString(l int) string {
+	bytes := make([]byte, l)
+	for i := 0; i < l; i++ {
+		bytes[i] = byte(randInt(65, 90))
+	}
+	return string(bytes)
+}
+
+func randInt(min int, max int) int {
+	return min + rand.Intn(max-min)
+}
