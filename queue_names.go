@@ -5,9 +5,9 @@ func InputQueueName(queue *Queue) string {
 }
 
 func WorkingQueueName(queue *Queue, consumer string) string {
-	return "requeue::" + queue.name + "::working::" + consumer
+	return "rqueue::" + queue.name + "::working::" + consumer
 }
 
 func FailedQueueName(queue *Queue) string {
-	return "requeue::" + queue.name + "::failed"
+	return "rqueue::" + queue.name + "::failed"
 }

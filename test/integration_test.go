@@ -182,6 +182,9 @@ func (suite *TestSuite) TestGetFailed(c *C) {
 //should handle multiple queues
 func (suite *TestSuite) TestSecondQueue(c *C) {
 	secondQueue := rqueue.NewQueue(suite.goenv, "teststuff2")
+	secondQueue.ResetInput()
+	secondQueue.ResetFailed()
+	secondQueue.ResetWorking(suite.consumer)
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 	c.Check(secondQueue.Put("testpayload2"), Equals, nil)
 
