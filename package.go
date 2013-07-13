@@ -13,11 +13,12 @@ type Package struct {
 	Queue      *Queue      `json:"-"`
 	Consumer   string      `json:"-"`
 	Collection *[]*Package `json:"-"`
+	Acked      bool        `json:"-"`
 	//TODO add Headers or smth. when needed
 }
 
 func UnmarshalPackage(input string, queue *Queue, consumer string) (*Package, error) {
-	p := &Package{Queue: queue, Consumer: consumer}
+	p := &Package{Queue: queue, Consumer: consumer, Acked: false}
 	err := json.Unmarshal([]byte(input), p)
 	if err != nil {
 		return nil, err
@@ -49,21 +50,37 @@ func (p *Package) Index() int {
 	return i
 }
 
-func (p *Package) Ack() (err error) {
+func (p *Package) MutliAck() (err error) {
+	if p.Collection == nil {
+		return fmt.Errorf("cannot MultiAck single package")
+	}
 	for i := 0; i <= p.Index(); i++ {
 		var p2 *Package
-		if i == 0 {
-			p2 = p
-		} else {
-			p2 = (*p.Collection)[i]
+		p2 = (*p.Collection)[i]
+		//if the package has already been acked just skip
+		if p2.Acked == true {
+			continue
 		}
+
 		err = p2.Queue.AckPackage(p2)
+		if err != nil {
+			break
+		}
+		p2.Acked = true
 	}
 	return
 }
 
+func (p *Package) Ack() error {
+	if p.Collection != nil {
+		return fmt.Errorf("cannot Ack package in multi package answer")
+	}
+	err := p.Queue.AckPackage(p)
+	return err
+}
+
 func (p *Package) Reject(requeue bool) error {
-	if p.Index() != 0 {
+	if p.Collection != nil && (*p.Collection)[p.Index()-1].Acked == false {
 		return fmt.Errorf("cannot reject package while unacked package before it")
 	}
 

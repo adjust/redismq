@@ -227,7 +227,7 @@ func (suite *TestSuite) TestMultiGetAndAck(c *C) {
 	for j := range p {
 		c.Check(p[j].Payload, Equals, "testpayload")
 	}
-	c.Check(p[len(p)-1].Ack(), Equals, nil)
+	c.Check(p[len(p)-1].MutliAck(), Equals, nil)
 	c.Check(suite.queue.HasUnacked(suite.consumer), Equals, false)
 }
 
@@ -246,8 +246,38 @@ func (suite *TestSuite) TestMultiGetAndPartialAck(c *C) {
 	for j := range p {
 		c.Check(p[j].Payload, Equals, "testpayload")
 	}
-	c.Check(p[49].Ack(), Equals, nil)
+	c.Check(p[49].MutliAck(), Equals, nil)
 	c.Check(suite.queue.UnackedLength(suite.consumer), Equals, int64(50))
+}
+
+//should get multiple packages from queue and not reject the middle one
+func (suite *TestSuite) TestMultiGetAndBlockedReject(c *C) {
+	for i := 0; i < 100; i++ {
+		c.Check(suite.queue.Put("testpayload"), Equals, nil)
+	}
+	p, err := suite.queue.MultiGet(suite.consumer, 100)
+	c.Check(err, Equals, nil)
+	c.Check(p[49].Reject(false), Not(Equals), nil)
+	c.Check(p[48].MutliAck(), Equals, nil)
+	c.Check(p[49].Reject(false), Equals, nil)
+	c.Check(suite.queue.UnackedLength(suite.consumer), Equals, int64(50))
+}
+
+//should get multiple packages from queue and ack them in one after another
+func (suite *TestSuite) TestMultiGetAndMultiAck(c *C) {
+	for i := 0; i < 100; i++ {
+		c.Check(suite.queue.Put("testpayload"), Equals, nil)
+	}
+	p, err := suite.queue.MultiGet(suite.consumer, 100)
+	c.Check(err, Equals, nil)
+	c.Check(p[49].MutliAck(), Equals, nil)
+	c.Check(suite.queue.UnackedLength(suite.consumer), Equals, int64(50))
+	c.Check(p[49].MutliAck(), Equals, nil)
+	c.Check(suite.queue.UnackedLength(suite.consumer), Equals, int64(50))
+	c.Check(p[50].MutliAck(), Equals, nil)
+	c.Check(suite.queue.UnackedLength(suite.consumer), Equals, int64(49))
+	c.Check(p[98].MutliAck(), Equals, nil)
+	c.Check(suite.queue.UnackedLength(suite.consumer), Equals, int64(1))
 }
 
 //TODO write stats watcher
