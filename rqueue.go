@@ -29,8 +29,28 @@ func (queue *Queue) Get(consumer string) (*Package, error) {
 	if queue.HasUnacked(consumer) {
 		return nil, fmt.Errorf("unacked Packages found!")
 	}
+	return queue.unsafeGet(consumer)
+}
+
+func (queue *Queue) unsafeGet(consumer string) (*Package, error) {
 	answer := queue.redisClient.BRPopLPush(InputQueueName(queue), WorkingQueueName(queue, consumer), 0)
 	return queue.parseRedisAnswer(answer, consumer)
+}
+
+func (queue *Queue) MultiGet(consumer string, length int) ([]*Package, error) {
+	var collection []*Package
+	if queue.HasUnacked(consumer) {
+		return nil, fmt.Errorf("unacked Packages found!")
+	}
+	for i := 0; i < length; i++ {
+		p, err := queue.unsafeGet(consumer)
+		if err != nil {
+			return nil, err
+		}
+		p.Collection = &collection
+		collection = append(collection, p)
+	}
+	return collection, nil
 }
 
 func (queue *Queue) GetUnacked(consumer string) (*Package, error) {

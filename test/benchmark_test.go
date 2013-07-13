@@ -28,6 +28,19 @@ func (suite *TestSuite) BenchmarkSingleCon1k(c *C) {
 	}
 }
 
+//benchmark single consumer multi 100 1k payload
+func (suite *TestSuite) BenchmarkSingleConMutli1k(c *C) {
+	payload := randomString(1024)
+	for i := 0; i < 100000; i++ {
+		suite.queue.Put(payload)
+	}
+	c.ResetTimer()
+	for i := 0; i < c.N; i++ {
+		p, _ := suite.queue.MultiGet(suite.consumer, 100)
+		p[99].Ack()
+	}
+}
+
 //benchmark single publisher 4k payload
 func (suite *TestSuite) BenchmarkSinglePub4k(c *C) {
 	payload := randomString(1024 * 4)

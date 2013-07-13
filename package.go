@@ -2,16 +2,17 @@ package rqueue
 
 import (
 	"encoding/json"
-	//"fmt"
+	"fmt"
 	"log"
 	"time"
 )
 
 type Package struct {
-	Payload   string
-	CreatedAt time.Time
-	Queue     *Queue `json:"-"`
-	Consumer  string `json:"-"`
+	Payload    string
+	CreatedAt  time.Time
+	Queue      *Queue      `json:"-"`
+	Consumer   string      `json:"-"`
+	Collection *[]*Package `json:"-"`
 	//TODO add Headers or smth. when needed
 }
 
@@ -35,12 +36,37 @@ func (p *Package) GetString() string {
 	return string(json)
 }
 
-func (p *Package) Ack() error {
-	err := p.Queue.AckPackage(p)
-	return err
+func (p *Package) Index() int {
+	if p.Collection == nil {
+		return 0
+	}
+	var i int
+	for i = range *p.Collection {
+		if (*p.Collection)[i] == p {
+			break
+		}
+	}
+	return i
+}
+
+func (p *Package) Ack() (err error) {
+	for i := 0; i <= p.Index(); i++ {
+		var p2 *Package
+		if i == 0 {
+			p2 = p
+		} else {
+			p2 = (*p.Collection)[i]
+		}
+		err = p2.Queue.AckPackage(p2)
+	}
+	return
 }
 
 func (p *Package) Reject(requeue bool) error {
+	if p.Index() != 0 {
+		return fmt.Errorf("cannot reject package while unacked package before it")
+	}
+
 	if !requeue {
 		err := p.Queue.FailPackage(p)
 		return err

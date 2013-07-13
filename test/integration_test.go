@@ -212,6 +212,44 @@ func (suite *TestSuite) TestHugePayload(c *C) {
 	c.Check(suite.queue.HasUnacked(suite.consumer), Equals, false)
 }
 
+//should get multiple packages from queue and ack all of them
+func (suite *TestSuite) TestMultiGetAndAck(c *C) {
+	for i := 0; i < 100; i++ {
+		c.Check(suite.queue.Put("testpayload"), Equals, nil)
+	}
+	c.Check(suite.queue.InputLength(), Equals, int64(100))
+
+	p, err := suite.queue.MultiGet(suite.consumer, 100)
+	c.Check(err, Equals, nil)
+	c.Check(suite.queue.InputLength(), Equals, int64(0))
+	c.Check(suite.queue.UnackedLength(suite.consumer), Equals, int64(100))
+
+	for j := range p {
+		c.Check(p[j].Payload, Equals, "testpayload")
+	}
+	c.Check(p[len(p)-1].Ack(), Equals, nil)
+	c.Check(suite.queue.HasUnacked(suite.consumer), Equals, false)
+}
+
+//should get multiple packages from queue and ack half of them
+func (suite *TestSuite) TestMultiGetAndPartialAck(c *C) {
+	for i := 0; i < 100; i++ {
+		c.Check(suite.queue.Put("testpayload"), Equals, nil)
+	}
+	c.Check(suite.queue.InputLength(), Equals, int64(100))
+
+	p, err := suite.queue.MultiGet(suite.consumer, 100)
+	c.Check(err, Equals, nil)
+	c.Check(suite.queue.InputLength(), Equals, int64(0))
+	c.Check(suite.queue.UnackedLength(suite.consumer), Equals, int64(100))
+
+	for j := range p {
+		c.Check(p[j].Payload, Equals, "testpayload")
+	}
+	c.Check(p[49].Ack(), Equals, nil)
+	c.Check(suite.queue.UnackedLength(suite.consumer), Equals, int64(50))
+}
+
 //TODO write stats watcher
 //should get numbers of consumers
 
