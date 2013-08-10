@@ -8,8 +8,9 @@ import (
 
 func main() {
 	goenv := goenv.DefaultGoenv()
-	testQueue := redismq.NewQueue(goenv, "clicks")
+	testQueue := redismq.NewQueue(goenv, "example")
 	payload := randomString(1024 * 1) //adjust for size
+	redismq.NewQueueWatcher(goenv)
 
 	for {
 		testQueue.Put(payload)
