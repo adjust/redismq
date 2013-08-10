@@ -3,7 +3,7 @@ package main
 import (
 	//"fmt"
 	"github.com/adeven/goenv"
-	"github.com/adeven/rqueue"
+	"github.com/adeven/redismq"
 	. "github.com/matttproud/gocheck"
 	"math/rand"
 	"runtime"
@@ -15,7 +15,7 @@ func Test(t *testing.T) { TestingT(t) }
 
 type TestSuite struct {
 	goenv    *goenv.Goenv
-	queue    *rqueue.Queue
+	queue    *redismq.Queue
 	consumer string
 }
 
@@ -25,7 +25,7 @@ func (suite *TestSuite) SetUpSuite(c *C) {
 	runtime.GOMAXPROCS(8)
 	rand.Seed(time.Now().UTC().UnixNano())
 	suite.goenv = goenv.NewGoenv("../example/config.yml", "gotesting", "../example/log/test.log")
-	suite.queue = rqueue.NewQueue(suite.goenv, "teststuff")
+	suite.queue = redismq.NewQueue(suite.goenv, "teststuff")
 	suite.consumer = "testconsumer"
 }
 
@@ -179,7 +179,7 @@ func (suite *TestSuite) TestGetFailed(c *C) {
 
 //should handle multiple queues
 func (suite *TestSuite) TestSecondQueue(c *C) {
-	secondQueue := rqueue.NewQueue(suite.goenv, "teststuff2")
+	secondQueue := redismq.NewQueue(suite.goenv, "teststuff2")
 	secondQueue.ResetInput()
 	secondQueue.ResetFailed()
 	secondQueue.ResetWorking(suite.consumer)
