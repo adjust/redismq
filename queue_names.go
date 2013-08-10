@@ -1,13 +1,13 @@
-package rqueue
+package redismq
 
 func InputQueueName(queue *Queue) string {
-	return "rqueue::" + queue.name
+	return "redismq::" + queue.name
 }
 
 func WorkingQueueName(queue *Queue, consumer string) string {
-	return "rqueue::" + queue.name + "::working::" + consumer
+	return "redismq::" + queue.name + "::working::" + consumer
 }
 
 func FailedQueueName(queue *Queue) string {
-	return "rqueue::" + queue.name + "::failed"
+	return "redismq::" + queue.name + "::failed"
 }

@@ -3,12 +3,12 @@ package main
 import (
 	"fmt"
 	"github.com/adeven/goenv"
-	"github.com/adeven/rqueue"
+	"github.com/adeven/redismq"
 )
 
 func main() {
 	goenv := goenv.DefaultGoenv()
-	testQueue := rqueue.NewQueue(goenv, "clicks")
+	testQueue := redismq.NewQueue(goenv, "clicks")
 	for i := 0; i < 10; i++ {
 		testQueue.Put("testpayload")
 	}

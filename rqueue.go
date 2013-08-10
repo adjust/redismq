@@ -1,4 +1,4 @@
-package rqueue
+package redismq
 
 import (
 	"fmt"
