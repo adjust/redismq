@@ -73,6 +73,7 @@ func (queue *Queue) HasUnacked(consumer string) bool {
 	return false
 }
 
+//TODO implement this in lua
 func (queue *Queue) RequeueFailed() error {
 	l := queue.FailedLength()
 	for l > 0 {

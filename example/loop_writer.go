@@ -9,7 +9,7 @@ import (
 func main() {
 	goenv := goenv.DefaultGoenv()
 	testQueue := redismq.NewQueue(goenv, "clicks")
-	payload := randomString(1024 * 4) //adjust for size
+	payload := randomString(1024 * 1) //adjust for size
 
 	for {
 		testQueue.Put(payload)

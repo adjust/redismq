@@ -15,6 +15,7 @@ type Package struct {
 	Collection *[]*Package `json:"-"`
 	Acked      bool        `json:"-"`
 	//TODO add Headers or smth. when needed
+	//wellle suggested error headers for failed packages
 }
 
 func UnmarshalPackage(input string, queue *Queue, consumer string) (*Package, error) {
