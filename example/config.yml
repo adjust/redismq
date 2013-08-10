@@ -4,30 +4,30 @@ config_file: GO_CONFIG  # defaults to ./config/config.yaml
 shard: GO_SHARD
 
 development:
-    log_file: ./log/rqueue.log
+    log_file: ./log/redismq.log
     redis:
         db: 9
 
 gotesting:
-    log_file: ./log/rqueue.log
+    log_file: ./log/redismq.log
     redis:
         db: 9
 
 testing:
-    log_file: ./log/rqueue.log
+    log_file: ./log/redismq.log
     redis:
         port: 63791
 
 staging:
-    log_file: /var/log/rqueue/rqueue.log
+    log_file: /var/log/redismq/redismq.log
 
 production:
-    log_file: /var/log/rqueue/rqueue.log
+    log_file: /var/log/redismq/redismq.log
     redis:
         port: 63791
 
 defaults:
-    log_file: ./log/rqueue.log
+    log_file: ./log/redismq.log
     redis:
         host: localhost
         port: 6379
