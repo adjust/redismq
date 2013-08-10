@@ -2,6 +2,7 @@ package redismq
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -57,7 +58,7 @@ func (self *Queue) GetFailed(consumer string) (*Package, error) {
 
 //TODO implement this in lua
 func (self *Queue) RequeueFailed() error {
-	l := self.FailedLength()
+	l := self.GetFailedLength()
 	for l > 0 {
 		answer := self.redisClient.RPopLPush(self.FailedName(), self.InputName())
 		if answer.Err() != nil {
@@ -100,4 +101,36 @@ func (self *Queue) FailPackage(p *Package) error {
 	answer := self.redisClient.RPopLPush(self.WorkingName(p.Consumer), self.FailedName())
 	self.redisClient.Incr(self.FailedCounterName())
 	return answer.Err()
+}
+
+//Statistics
+func (self *Queue) GetInputLength() int64 {
+	l := self.redisClient.LLen(self.InputName())
+	return l.Val()
+}
+
+func (self *Queue) GetFailedLength() int64 {
+	l := self.redisClient.LLen(self.FailedName())
+	return l.Val()
+}
+
+func (self *Queue) GetUnackedLength(consumer string) int64 {
+	l := self.redisClient.LLen(self.WorkingName(consumer))
+	return l.Val()
+}
+
+func (self *Queue) GetInputRate() int64 {
+	val, err := strconv.ParseInt(self.redisClient.GetSet(self.InputCounterName(), "0").Val(), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return val
+}
+
+func (self *Queue) GetFailedRate() int64 {
+	val, err := strconv.ParseInt(self.redisClient.GetSet(self.FailedCounterName(), "0").Val(), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return val
 }

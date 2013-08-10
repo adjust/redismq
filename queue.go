@@ -7,11 +7,11 @@ import (
 
 type Queue struct {
 	redisClient *redis.Client
-	name        string
+	Name        string
 }
 
 func NewQueue(goenv *goenv.Goenv, name string) *Queue {
-	q := &Queue{name: name}
+	q := &Queue{Name: name}
 	host, port, db := goenv.GetRedis()
 	q.redisClient = redis.NewTCPClient(host+":"+port, "", int64(db))
 	q.redisClient.SAdd(MasterQueueKey(), name)
@@ -23,15 +23,15 @@ func MasterQueueKey() string {
 }
 
 func (self *Queue) InputName() string {
-	return "redismq::" + self.name
+	return "redismq::" + self.Name
 }
 
 func (self *Queue) WorkingName(consumer string) string {
-	return "redismq::" + self.name + "::working::" + consumer
+	return "redismq::" + self.Name + "::working::" + consumer
 }
 
 func (self *Queue) FailedName() string {
-	return "redismq::" + self.name + "::failed"
+	return "redismq::" + self.Name + "::failed"
 }
 
 func (self *Queue) InputCounterName() string {
@@ -50,23 +50,8 @@ func (self *Queue) AckCounterName(consumer string) string {
 	return self.InputName() + "::ack::" + consumer + "::counter"
 }
 
-func (self *Queue) InputLength() int64 {
-	l := self.redisClient.LLen(self.InputName())
-	return l.Val()
-}
-
-func (self *Queue) FailedLength() int64 {
-	l := self.redisClient.LLen(self.FailedName())
-	return l.Val()
-}
-
-func (self *Queue) UnackedLength(consumer string) int64 {
-	l := self.redisClient.LLen(self.WorkingName(consumer))
-	return l.Val()
-}
-
 func (self *Queue) HasUnacked(consumer string) bool {
-	if self.UnackedLength(consumer) != 0 {
+	if self.GetUnackedLength(consumer) != 0 {
 		return true
 	}
 	return false

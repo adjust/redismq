@@ -51,6 +51,7 @@ func (p *Package) Index() int {
 	return i
 }
 
+//TODO write in lua
 func (p *Package) MutliAck() (err error) {
 	if p.Collection == nil {
 		return fmt.Errorf("cannot MultiAck single package")
