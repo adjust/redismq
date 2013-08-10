@@ -16,7 +16,7 @@ func Test(t *testing.T) { TestingT(t) }
 type TestSuite struct {
 	goenv    *goenv.Goenv
 	queue    *redismq.Queue
-	consumer string
+	consumer *redismq.Consumer
 }
 
 var _ = Suite(&TestSuite{})
@@ -26,24 +26,24 @@ func (suite *TestSuite) SetUpSuite(c *C) {
 	rand.Seed(time.Now().UTC().UnixNano())
 	suite.goenv = goenv.NewGoenv("../example/config.yml", "gotesting", "../example/log/test.log")
 	suite.queue = redismq.NewQueue(suite.goenv, "teststuff")
-	suite.consumer = "testconsumer"
+	suite.consumer, _ = suite.queue.AddConsumer("testconsumer")
 }
 
 func (suite *TestSuite) SetUpTest(c *C) {
 	suite.queue.ResetInput()
 	suite.queue.ResetFailed()
-	suite.queue.ResetWorking(suite.consumer)
-	suite.queue.ResetWorking(suite.consumer + "2")
+	suite.consumer.ResetWorking()
+	//suite.consumer.ResetWorking(suite.consumer + "2")
 }
 
 //should put package into queue
 func (suite *TestSuite) TestPutGetAndAck(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
-	p, err := suite.queue.Get(suite.consumer)
+	p, err := suite.consumer.Get()
 	c.Check(err, Equals, nil)
 	c.Check(p.Payload, Equals, "testpayload")
 	c.Check(p.Ack(), Equals, nil)
-	c.Check(suite.queue.HasUnacked(suite.consumer), Equals, false)
+	c.Check(suite.consumer.HasUnacked(), Equals, false)
 }
 
 //should queue packages
@@ -59,23 +59,23 @@ func (suite *TestSuite) TestSecondGet(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 
-	p, err := suite.queue.Get(suite.consumer)
+	p, err := suite.consumer.Get()
 	c.Check(err, Equals, nil)
 
-	_, err = suite.queue.Get(suite.consumer)
+	_, err = suite.consumer.Get()
 	c.Check(err, Not(Equals), nil)
 
 	err = p.Ack()
 	c.Check(err, Equals, nil)
 
-	_, err = suite.queue.Get(suite.consumer)
+	_, err = suite.consumer.Get()
 	c.Check(err, Equals, nil)
 }
 
 //test waiting for get
 func (suite *TestSuite) TestWaitForGet(c *C) {
 	go func() {
-		p, err := suite.queue.Get(suite.consumer)
+		p, err := suite.consumer.Get()
 		c.Check(err, Equals, nil)
 		c.Check(p.Payload, Equals, "testpayload")
 	}()
@@ -88,12 +88,16 @@ func (suite *TestSuite) TestSecondConsumer(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 
-	p, err := suite.queue.Get(suite.consumer)
+	p, err := suite.consumer.Get()
 	c.Check(err, Equals, nil)
 	c.Check(p.Payload, Equals, "testpayload")
 
-	p2, err2 := suite.queue.Get(suite.consumer + "2")
-	c.Check(err2, Equals, nil)
+	consumer, err := suite.queue.AddConsumer("testconsumer2")
+	c.Check(err, Equals, nil)
+	consumer.ResetWorking()
+
+	p2, err := consumer.Get()
+	c.Check(err, Equals, nil)
 	c.Check(p2.Payload, Equals, "testpayload")
 }
 
@@ -101,11 +105,11 @@ func (suite *TestSuite) TestSecondConsumer(c *C) {
 func (suite *TestSuite) TestRequeue(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 
-	p, err := suite.queue.Get(suite.consumer)
+	p, err := suite.consumer.Get()
 	c.Check(err, Equals, nil)
 	c.Check(p.Reject(true), Equals, nil)
 
-	p2, err2 := suite.queue.Get(suite.consumer)
+	p2, err2 := suite.consumer.Get()
 	c.Check(err2, Equals, nil)
 	c.Check(p2.Payload, Equals, "testpayload")
 }
@@ -114,7 +118,7 @@ func (suite *TestSuite) TestRequeue(c *C) {
 func (suite *TestSuite) TestFailed(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 
-	p, err := suite.queue.Get(suite.consumer)
+	p, err := suite.consumer.Get()
 	c.Check(err, Equals, nil)
 	c.Check(p.Reject(false), Equals, nil)
 
@@ -125,19 +129,19 @@ func (suite *TestSuite) TestFailed(c *C) {
 func (suite *TestSuite) TestGetUnacked(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 
-	_, err := suite.queue.Get(suite.consumer)
+	_, err := suite.consumer.Get()
 	c.Check(err, Equals, nil)
 	//Assume that consumer crashed and receives err on get
 
-	_, err = suite.queue.Get(suite.consumer)
+	_, err = suite.consumer.Get()
 	c.Check(err, Not(Equals), nil)
 
-	p, err := suite.queue.GetUnacked(suite.consumer)
+	p, err := suite.consumer.GetUnacked()
 	c.Check(err, Equals, nil)
 	c.Check(p.Payload, Equals, "testpayload")
 	c.Check(p.Ack(), Equals, nil)
 
-	c.Check(suite.queue.GetUnackedLength(suite.consumer), Equals, int64(0))
+	c.Check(suite.consumer.GetUnackedLength(), Equals, int64(0))
 }
 
 //should requeue failed
@@ -146,7 +150,7 @@ func (suite *TestSuite) TestRequeueFailed(c *C) {
 		c.Check(suite.queue.Put("testpayload"), Equals, nil)
 	}
 	for i := 0; i < 100; i++ {
-		p, err := suite.queue.Get(suite.consumer)
+		p, err := suite.consumer.Get()
 		c.Check(err, Equals, nil)
 		c.Check(p.Reject(false), Equals, nil)
 	}
@@ -160,12 +164,12 @@ func (suite *TestSuite) TestRequeueFailed(c *C) {
 func (suite *TestSuite) TestGetFailed(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 
-	p, err := suite.queue.Get(suite.consumer)
+	p, err := suite.consumer.Get()
 	c.Check(err, Equals, nil)
 	c.Check(p.Reject(false), Equals, nil)
 	c.Check(suite.queue.GetFailedLength(), Equals, int64(1))
 
-	p2, err := suite.queue.GetFailed(suite.consumer)
+	p2, err := suite.consumer.GetFailed()
 	c.Check(err, Equals, nil)
 	c.Check(p2.Payload, Equals, "testpayload")
 	c.Check(p2.Ack(), Equals, nil)
@@ -173,30 +177,33 @@ func (suite *TestSuite) TestGetFailed(c *C) {
 	c.Check(suite.queue.GetInputLength(), Equals, int64(0))
 
 	//try getting smth from empty failed queue
-	_, err = suite.queue.GetFailed(suite.consumer)
+	_, err = suite.consumer.GetFailed()
 	c.Check(err, Not(Equals), nil)
 }
 
 //should handle multiple queues
 func (suite *TestSuite) TestSecondQueue(c *C) {
 	secondQueue := redismq.NewQueue(suite.goenv, "teststuff2")
+	secondConsumer, err := secondQueue.AddConsumer("testconsumer")
+	c.Check(err, Equals, nil)
+
 	secondQueue.ResetInput()
 	secondQueue.ResetFailed()
-	secondQueue.ResetWorking(suite.consumer)
+	secondConsumer.ResetWorking()
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 	c.Check(secondQueue.Put("testpayload2"), Equals, nil)
 
-	p, err := suite.queue.Get(suite.consumer)
+	p, err := suite.consumer.Get()
 	c.Check(err, Equals, nil)
 	c.Check(p.Payload, Equals, "testpayload")
 
-	p2, err := secondQueue.Get(suite.consumer)
+	p2, err := secondConsumer.Get()
 	c.Check(err, Equals, nil)
 	c.Check(p2.Payload, Equals, "testpayload2")
 
 	secondQueue.ResetInput()
 	secondQueue.ResetFailed()
-	secondQueue.ResetWorking(suite.consumer)
+	secondConsumer.ResetWorking()
 }
 
 //should handle huge payloads
@@ -205,11 +212,11 @@ func (suite *TestSuite) TestHugePayload(c *C) {
 	payload := randomString(1024 * 1024 * 10)
 
 	c.Check(suite.queue.Put(payload), Equals, nil)
-	p, err := suite.queue.Get(suite.consumer)
+	p, err := suite.consumer.Get()
 	c.Check(err, Equals, nil)
 	c.Check(p.Payload, Equals, payload)
 	c.Check(p.Ack(), Equals, nil)
-	c.Check(suite.queue.HasUnacked(suite.consumer), Equals, false)
+	c.Check(suite.consumer.HasUnacked(), Equals, false)
 }
 
 //should get multiple packages from queue and ack all of them
@@ -219,16 +226,16 @@ func (suite *TestSuite) TestMultiGetAndAck(c *C) {
 	}
 	c.Check(suite.queue.GetInputLength(), Equals, int64(100))
 
-	p, err := suite.queue.MultiGet(suite.consumer, 100)
+	p, err := suite.consumer.MultiGet(100)
 	c.Check(err, Equals, nil)
 	c.Check(suite.queue.GetInputLength(), Equals, int64(0))
-	c.Check(suite.queue.GetUnackedLength(suite.consumer), Equals, int64(100))
+	c.Check(suite.consumer.GetUnackedLength(), Equals, int64(100))
 
 	for j := range p {
 		c.Check(p[j].Payload, Equals, "testpayload")
 	}
 	c.Check(p[len(p)-1].MutliAck(), Equals, nil)
-	c.Check(suite.queue.HasUnacked(suite.consumer), Equals, false)
+	c.Check(suite.consumer.HasUnacked(), Equals, false)
 }
 
 //should get multiple packages from queue and ack half of them
@@ -238,16 +245,16 @@ func (suite *TestSuite) TestMultiGetAndPartialAck(c *C) {
 	}
 	c.Check(suite.queue.GetInputLength(), Equals, int64(100))
 
-	p, err := suite.queue.MultiGet(suite.consumer, 100)
+	p, err := suite.consumer.MultiGet(100)
 	c.Check(err, Equals, nil)
 	c.Check(suite.queue.GetInputLength(), Equals, int64(0))
-	c.Check(suite.queue.GetUnackedLength(suite.consumer), Equals, int64(100))
+	c.Check(suite.consumer.GetUnackedLength(), Equals, int64(100))
 
 	for j := range p {
 		c.Check(p[j].Payload, Equals, "testpayload")
 	}
 	c.Check(p[49].MutliAck(), Equals, nil)
-	c.Check(suite.queue.GetUnackedLength(suite.consumer), Equals, int64(50))
+	c.Check(suite.consumer.GetUnackedLength(), Equals, int64(50))
 }
 
 //should get multiple packages from queue and not reject the middle one
@@ -255,12 +262,12 @@ func (suite *TestSuite) TestMultiGetAndBlockedReject(c *C) {
 	for i := 0; i < 100; i++ {
 		c.Check(suite.queue.Put("testpayload"), Equals, nil)
 	}
-	p, err := suite.queue.MultiGet(suite.consumer, 100)
+	p, err := suite.consumer.MultiGet(100)
 	c.Check(err, Equals, nil)
 	c.Check(p[49].Reject(false), Not(Equals), nil)
 	c.Check(p[48].MutliAck(), Equals, nil)
 	c.Check(p[49].Reject(false), Equals, nil)
-	c.Check(suite.queue.GetUnackedLength(suite.consumer), Equals, int64(50))
+	c.Check(suite.consumer.GetUnackedLength(), Equals, int64(50))
 }
 
 //should get multiple packages from queue and ack them in one after another
@@ -268,16 +275,16 @@ func (suite *TestSuite) TestMultiGetAndMultiAck(c *C) {
 	for i := 0; i < 100; i++ {
 		c.Check(suite.queue.Put("testpayload"), Equals, nil)
 	}
-	p, err := suite.queue.MultiGet(suite.consumer, 100)
+	p, err := suite.consumer.MultiGet(100)
 	c.Check(err, Equals, nil)
 	c.Check(p[49].MutliAck(), Equals, nil)
-	c.Check(suite.queue.GetUnackedLength(suite.consumer), Equals, int64(50))
+	c.Check(suite.consumer.GetUnackedLength(), Equals, int64(50))
 	c.Check(p[49].MutliAck(), Equals, nil)
-	c.Check(suite.queue.GetUnackedLength(suite.consumer), Equals, int64(50))
+	c.Check(suite.consumer.GetUnackedLength(), Equals, int64(50))
 	c.Check(p[50].MutliAck(), Equals, nil)
-	c.Check(suite.queue.GetUnackedLength(suite.consumer), Equals, int64(49))
+	c.Check(suite.consumer.GetUnackedLength(), Equals, int64(49))
 	c.Check(p[98].MutliAck(), Equals, nil)
-	c.Check(suite.queue.GetUnackedLength(suite.consumer), Equals, int64(1))
+	c.Check(suite.consumer.GetUnackedLength(), Equals, int64(1))
 }
 
 //TODO write stats watcher

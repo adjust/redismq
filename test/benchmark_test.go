@@ -2,6 +2,7 @@ package main
 
 import (
 	//"fmt"
+	"github.com/adeven/redismq"
 	. "github.com/matttproud/gocheck"
 	"strconv"
 	"sync"
@@ -23,20 +24,20 @@ func (suite *TestSuite) BenchmarkSingleCon1k(c *C) {
 	}
 	c.ResetTimer()
 	for i := 0; i < c.N; i++ {
-		p, _ := suite.queue.Get(suite.consumer)
+		p, _ := suite.consumer.Get()
 		p.Ack()
 	}
 }
 
 //benchmark single consumer multi 100 1k payload
-func (suite *TestSuite) BenchmarkSingleConMutli1k(c *C) {
+func (suite *TestSuite) BenchmarkSingleConMulti1k(c *C) {
 	payload := randomString(1024)
 	for i := 0; i < 100000; i++ {
 		suite.queue.Put(payload)
 	}
 	c.ResetTimer()
 	for i := 0; i < c.N; i++ {
-		p, _ := suite.queue.MultiGet(suite.consumer, 100)
+		p, _ := suite.consumer.MultiGet(100)
 		p[99].Ack()
 	}
 }
@@ -57,7 +58,7 @@ func (suite *TestSuite) BenchmarkSingleCon4k(c *C) {
 	}
 	c.ResetTimer()
 	for i := 0; i < c.N; i++ {
-		p, _ := suite.queue.Get(suite.consumer)
+		p, _ := suite.consumer.Get()
 		p.Ack()
 	}
 }
@@ -88,12 +89,13 @@ func (suite *TestSuite) BenchmarkFourCon1k(c *C) {
 	c.ResetTimer()
 	for i := 0; i < c.N; i++ {
 		for j := 0; j < 4; j++ {
+			consumer, _ := suite.queue.AddConsumer("test" + strconv.Itoa(i) + strconv.Itoa(j))
 			wg.Add(1)
-			go func(j int) {
-				p, _ := suite.queue.Get(suite.consumer + strconv.Itoa(i) + strconv.Itoa(j))
+			go func(consumer *redismq.Consumer) {
+				p, _ := consumer.Get()
 				p.Ack()
 				defer wg.Done()
-			}(j)
+			}(consumer)
 		}
 		wg.Wait()
 	}
@@ -125,12 +127,13 @@ func (suite *TestSuite) BenchmarkFourCon4k(c *C) {
 	c.ResetTimer()
 	for i := 0; i < c.N; i++ {
 		for j := 0; j < 4; j++ {
+			consumer, _ := suite.queue.AddConsumer("test" + strconv.Itoa(i) + strconv.Itoa(j))
 			wg.Add(1)
-			go func(j int) {
-				p, _ := suite.queue.Get(suite.consumer + strconv.Itoa(i) + strconv.Itoa(j))
+			go func(consumer *redismq.Consumer) {
+				p, _ := consumer.Get()
 				p.Ack()
 				defer wg.Done()
-			}(j)
+			}(consumer)
 		}
 		wg.Wait()
 	}
@@ -150,7 +153,7 @@ func (suite *TestSuite) BenchmarkSingPubSingCon1k(c *C) {
 		}()
 		wg.Add(1)
 		go func() {
-			p, _ := suite.queue.Get(suite.consumer)
+			p, _ := suite.consumer.Get()
 			p.Ack()
 			defer wg.Done()
 		}()
@@ -172,7 +175,7 @@ func (suite *TestSuite) BenchmarkSingPubSingCon4k(c *C) {
 		}()
 		wg.Add(1)
 		go func() {
-			p, _ := suite.queue.Get(suite.consumer)
+			p, _ := suite.consumer.Get()
 			p.Ack()
 			defer wg.Done()
 		}()
@@ -193,12 +196,13 @@ func (suite *TestSuite) BenchmarkFourPubFourCon1k(c *C) {
 				suite.queue.Put(payload)
 				defer wg.Done()
 			}()
+			consumer, _ := suite.queue.AddConsumer("test" + strconv.Itoa(i) + strconv.Itoa(j))
 			wg.Add(1)
-			go func(j int) {
-				p, _ := suite.queue.Get(suite.consumer + strconv.Itoa(j) + strconv.Itoa(i))
+			go func(consumer *redismq.Consumer) {
+				p, _ := consumer.Get()
 				p.Ack()
 				defer wg.Done()
-			}(j)
+			}(consumer)
 		}
 		wg.Wait()
 	}
@@ -217,12 +221,13 @@ func (suite *TestSuite) BenchmarkFourPubFourCon4k(c *C) {
 				suite.queue.Put(payload)
 				defer wg.Done()
 			}()
+			consumer, _ := suite.queue.AddConsumer("test" + strconv.Itoa(i) + strconv.Itoa(j))
 			wg.Add(1)
-			go func(j int) {
-				p, _ := suite.queue.Get(suite.consumer + strconv.Itoa(j) + strconv.Itoa(i))
+			go func(consumer *redismq.Consumer) {
+				p, _ := consumer.Get()
 				p.Ack()
 				defer wg.Done()
-			}(j)
+			}(consumer)
 		}
 		wg.Wait()
 	}
