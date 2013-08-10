@@ -1,7 +1,7 @@
 package main
 
 import (
-	//"fmt"
+	"fmt"
 	"github.com/adeven/redismq"
 	. "github.com/matttproud/gocheck"
 	"strconv"
@@ -38,7 +38,7 @@ func (suite *TestSuite) BenchmarkSingleConMulti1k(c *C) {
 	c.ResetTimer()
 	for i := 0; i < c.N; i++ {
 		p, _ := suite.consumer.MultiGet(100)
-		p[99].Ack()
+		p[99].MutliAck()
 	}
 }
 
