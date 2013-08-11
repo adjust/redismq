@@ -8,7 +8,6 @@ import (
 type Queue struct {
 	redisClient *redis.Client
 	Name        string
-	Consumers   []*Consumer
 }
 
 func NewQueue(goenv *goenv.Goenv, name string) *Queue {
@@ -21,6 +20,10 @@ func NewQueue(goenv *goenv.Goenv, name string) *Queue {
 
 func MasterQueueKey() string {
 	return "redismq::queues"
+}
+
+func (self *Queue) WorkerKey() string {
+	return self.InputName() + "::workers"
 }
 
 func (self *Queue) InputName() string {

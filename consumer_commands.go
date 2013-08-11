@@ -12,8 +12,8 @@ func (self *Consumer) Get() (*Package, error) {
 }
 
 func (self *Consumer) unsafeGet() (*Package, error) {
-	answer := self.Queue.redisClient.BRPopLPush(self.Queue.InputName(), self.WorkingName(), 0)
-	self.Queue.redisClient.Incr(self.WorkingCounterName())
+	answer := self.GetQueue().redisClient.BRPopLPush(self.GetQueue().InputName(), self.WorkingName(), 0)
+	self.GetQueue().redisClient.Incr(self.WorkingCounterName())
 	return self.parseRedisAnswer(answer)
 }
 
@@ -38,40 +38,35 @@ func (self *Consumer) GetUnacked() (*Package, error) {
 	if !self.HasUnacked() {
 		return nil, fmt.Errorf("no unacked Packages found!")
 	}
-	answer := self.Queue.redisClient.LIndex(self.WorkingName(), -1)
+	answer := self.GetQueue().redisClient.LIndex(self.WorkingName(), -1)
 	return self.parseRedisAnswer(answer)
 }
 
 func (self *Consumer) GetFailed() (*Package, error) {
-	answer := self.Queue.redisClient.RPopLPush(self.Queue.FailedName(), self.WorkingName())
-	self.Queue.redisClient.Incr(self.WorkingCounterName())
+	answer := self.GetQueue().redisClient.RPopLPush(self.GetQueue().FailedName(), self.WorkingName())
+	self.GetQueue().redisClient.Incr(self.WorkingCounterName())
 	return self.parseRedisAnswer(answer)
 }
 
 func (self *Consumer) AckPackage(p *Package) error {
-	answer := self.Queue.redisClient.RPop(self.WorkingName())
-	self.Queue.redisClient.Incr(self.AckCounterName())
+	answer := self.GetQueue().redisClient.RPop(self.WorkingName())
+	self.GetQueue().redisClient.Incr(self.AckCounterName())
 	return answer.Err()
 }
 
 func (self *Consumer) RequeuePackage(p *Package) error {
-	answer := self.Queue.redisClient.RPopLPush(self.WorkingName(), self.Queue.InputName())
-	self.Queue.redisClient.Incr(self.Queue.InputCounterName())
+	answer := self.GetQueue().redisClient.RPopLPush(self.WorkingName(), self.GetQueue().InputName())
+	self.GetQueue().redisClient.Incr(self.GetQueue().InputCounterName())
 	return answer.Err()
 }
 
 func (self *Consumer) FailPackage(p *Package) error {
-	answer := self.Queue.redisClient.RPopLPush(self.WorkingName(), self.Queue.FailedName())
-	self.Queue.redisClient.Incr(self.Queue.FailedCounterName())
+	answer := self.GetQueue().redisClient.RPopLPush(self.WorkingName(), self.GetQueue().FailedName())
+	self.GetQueue().redisClient.Incr(self.GetQueue().FailedCounterName())
 	return answer.Err()
 }
 
 func (self *Consumer) ResetWorking() error {
-	answer := self.Queue.redisClient.Del(self.WorkingName())
+	answer := self.GetQueue().redisClient.Del(self.WorkingName())
 	return answer.Err()
-}
-
-func (self *Consumer) GetUnackedLength() int64 {
-	l := self.Queue.redisClient.LLen(self.WorkingName())
-	return l.Val()
 }

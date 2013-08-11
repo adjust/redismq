@@ -14,9 +14,9 @@ func main() {
 	go write()
 	go read("1")
 	go read("2")
-	go read("3")
+	//go read("3")
 
-	redismq.NewQueueWatcher(goenv)
+	redismq.NewOverseer(goenv)
 	select {}
 }
 
@@ -42,12 +42,15 @@ func write() {
 }
 
 func read(prefix string) {
-	consumer := "consumer" + prefix
 	goenv := goenv.DefaultGoenv()
 	testQueue := redismq.NewQueue(goenv, "example")
-	testQueue.ResetWorking(consumer)
+	consumer, err := testQueue.AddConsumer("testconsumer" + prefix)
+	if err != nil {
+		panic(err)
+	}
+	consumer.ResetWorking()
 	for {
-		p, err := testQueue.Get(consumer)
+		p, err := consumer.Get()
 		if err != nil {
 			log.Println(err)
 			continue

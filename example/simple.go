@@ -12,8 +12,12 @@ func main() {
 	for i := 0; i < 10; i++ {
 		testQueue.Put("testpayload")
 	}
+	consumer, err := testQueue.AddConsumer("testconsumer")
+	if err != nil {
+		panic(err)
+	}
 	for i := 0; i < 10; i++ {
-		p, err := testQueue.Get("testconsumer")
+		p, err := consumer.Get()
 		if err != nil {
 			fmt.Println(err)
 			continue
