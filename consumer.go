@@ -1,6 +1,7 @@
 package redismq
 
 import (
+	//"fmt"
 	"github.com/adeven/redis"
 )
 
@@ -12,7 +13,10 @@ type Consumer struct {
 func (self *Queue) AddConsumer(name string) (c *Consumer, err error) {
 	c = &Consumer{Broker{Name: name, Queue: self}}
 	//check uniqueness and start heartbeat
-	self.redisClient.SAdd(self.WorkerKey(), name)
+	self.redisClient.SAdd(self.WorkerKey(), name).Val()
+	// if added == 0 {
+	// 	return nil, fmt.Errorf("consumer with this name is already active!")
+	// }
 	return c, nil
 }
 

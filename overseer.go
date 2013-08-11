@@ -20,14 +20,15 @@ type QueueStat struct {
 	AckRate       int64
 	FailRate      int64
 	InputSize     int64
-	WorkSize      int64
+	UnAckSize     int64
 	FailSize      int64
 	ConsumerStats map[string]*ConsumerStat
 }
 
 type ConsumerStat struct {
-	WorkRate int64
-	AckRate  int64
+	WorkRate  int64
+	AckRate   int64
+	UnAckSize int64
 }
 
 //TODO Test this?
@@ -67,6 +68,7 @@ func (self *Overseer) Poll(queue *Queue) {
 
 		self.Stats[queue.Name].WorkRate = 0
 		self.Stats[queue.Name].AckRate = 0
+		self.Stats[queue.Name].UnAckSize = 0
 
 		brokers, err := queue.GetBrokers()
 		if err != nil {
@@ -77,9 +79,11 @@ func (self *Overseer) Poll(queue *Queue) {
 			self.Stats[queue.Name].ConsumerStats[broker.Name] = &ConsumerStat{}
 			self.Stats[queue.Name].ConsumerStats[broker.Name].AckRate = broker.GetAckRate()
 			self.Stats[queue.Name].ConsumerStats[broker.Name].WorkRate = broker.GetWorkRate()
+			self.Stats[queue.Name].ConsumerStats[broker.Name].UnAckSize = broker.GetUnackedLength()
 
 			self.Stats[queue.Name].AckRate += self.Stats[queue.Name].ConsumerStats[broker.Name].AckRate
 			self.Stats[queue.Name].WorkRate += self.Stats[queue.Name].ConsumerStats[broker.Name].WorkRate
+			self.Stats[queue.Name].UnAckSize += self.Stats[queue.Name].ConsumerStats[broker.Name].UnAckSize
 		}
 		json, _ := json.Marshal(self)
 		log.Println(string(json))
