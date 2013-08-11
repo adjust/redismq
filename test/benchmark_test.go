@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	//"fmt"
 	"github.com/adeven/redismq"
 	. "github.com/matttproud/gocheck"
 	"strconv"

@@ -36,6 +36,12 @@ func (suite *TestSuite) SetUpTest(c *C) {
 	//suite.consumer.ResetWorking(suite.consumer + "2")
 }
 
+//should not allow a second consumer with the same name
+func (suite *TestSuite) TestUniqueConsumer(c *C) {
+	_, err := suite.queue.AddConsumer("testconsumer")
+	c.Check(err, Not(Equals), nil)
+}
+
 //should put package into queue
 func (suite *TestSuite) TestPutGetAndAck(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
