@@ -33,7 +33,6 @@ func (suite *TestSuite) SetUpTest(c *C) {
 	suite.queue.ResetInput()
 	suite.queue.ResetFailed()
 	suite.consumer.ResetWorking()
-	//suite.consumer.ResetWorking(suite.consumer + "2")
 }
 
 //should not allow a second consumer with the same name
