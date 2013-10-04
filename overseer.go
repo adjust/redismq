@@ -36,11 +36,19 @@ func NewOverseer(goenv *goenv.Goenv) *Overseer {
 	q := &Overseer{goenv: goenv, Stats: make(map[string]*QueueStat)}
 	host, port, db := goenv.GetRedis()
 	q.redisClient = redis.NewTCPClient(host+":"+port, "", int64(db))
-
-	for _, queue := range q.GetAllQueues() {
-		q.WatchQueue(queue)
-	}
+	go q.WatchAllQueues()
 	return q
+}
+
+func (self *Overseer) WatchAllQueues() {
+	for {
+		for _, queue := range self.GetAllQueues() {
+			if self.Stats[queue.Name] == nil {
+				self.WatchQueue(queue)
+			}
+		}
+		time.Sleep(2 * time.Second)
+	}
 }
 
 func (self *Overseer) GetAllQueues() (queues []*Queue) {
@@ -85,10 +93,16 @@ func (self *Overseer) Poll(queue *Queue) {
 			self.Stats[queue.Name].WorkRate += self.Stats[queue.Name].ConsumerStats[broker.Name].WorkRate
 			self.Stats[queue.Name].UnAckSize += self.Stats[queue.Name].ConsumerStats[broker.Name].UnAckSize
 		}
-		json, _ := json.Marshal(self)
-		log.Println(string(json))
 
 		time.Sleep(1 * time.Second)
 	}
 
+}
+
+func (self *Overseer) OutputToString() string {
+	json, err := json.Marshal(self)
+	if err != nil {
+		log.Fatalf("ERROR MARSHALLING OVERSEER %s", err.Error())
+	}
+	return string(json)
 }
