@@ -4,6 +4,7 @@ config_file: GO_CONFIG  # defaults to ./config/config.yaml
 shard: GO_SHARD
 
 development:
+    port: 9999
     log_file: ./log/redismq.log
     redis:
         db: 9
