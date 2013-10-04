@@ -11,12 +11,16 @@ import (
 func main() {
 	runtime.GOMAXPROCS(5)
 	goenv := goenv.DefaultGoenv()
-	go write()
-	go read("1")
-	go read("2")
+	over := redismq.NewOverseer(goenv)
+	server := redismq.NewServer(goenv, over)
+	go server.Start()
+	go write("example")
+	go write("example2")
+	go read("example", "1")
+	go read("example", "2")
+	go read("example2", "1")
+	go read("example2", "2")
 	//go read("3")
-
-	redismq.NewOverseer(goenv)
 	select {}
 }
 
@@ -32,18 +36,18 @@ func randInt(min int, max int) int {
 	return min + rand.Intn(max-min)
 }
 
-func write() {
+func write(queue string) {
 	goenv := goenv.DefaultGoenv()
-	testQueue := redismq.NewQueue(goenv, "example")
+	testQueue := redismq.NewQueue(goenv, queue)
 	payload := randomString(1024 * 1) //adjust for size
 	for {
 		testQueue.Put(payload)
 	}
 }
 
-func read(prefix string) {
+func read(queue, prefix string) {
 	goenv := goenv.DefaultGoenv()
-	testQueue := redismq.NewQueue(goenv, "example")
+	testQueue := redismq.NewQueue(goenv, queue)
 	consumer, err := testQueue.AddConsumer("testconsumer" + prefix)
 	if err != nil {
 		panic(err)
