@@ -3,6 +3,7 @@ package redismq
 import (
 	"fmt"
 	"github.com/adeven/redis"
+	"time"
 )
 
 func (self *Consumer) Get() (*Package, error) {
@@ -30,6 +31,7 @@ func (self *Consumer) MultiGet(length int) ([]*Package, error) {
 		return nil, fmt.Errorf("unacked Packages found!")
 	}
 
+	//TODO maybe use transactions for rollback in case of errors?
 	reqs, err := self.GetQueue().redisClient.Pipelined(func(c *redis.PipelineClient) {
 		c.BRPopLPush(self.GetQueue().InputName(), self.WorkingName(), 0)
 		for i := 1; i < length; i++ {
@@ -108,6 +110,15 @@ func (self *Consumer) FailPackage(p *Package) error {
 func (self *Consumer) ResetWorking() error {
 	answer := self.GetQueue().redisClient.Del(self.WorkingName())
 	return answer.Err()
+}
+
+func (self *Consumer) startHeartbeat() {
+	go func() {
+		for {
+			self.Queue.redisClient.SetEx(self.HeartbeatName(), 1, "ping")
+			time.Sleep(500 * time.Millisecond)
+		}
+	}()
 }
 
 func (self *Consumer) parseRedisAnswer(answer *redis.StringReq) (*Package, error) {

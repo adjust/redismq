@@ -15,9 +15,7 @@ func (self *Queue) Put(payload string) error {
 	return err
 }
 
-//TODO MultiPut?
-
-//TODO implement this in lua
+// TODO implement this in lua
 func (self *Queue) RequeueFailed() error {
 	l := self.GetFailedLength()
 	for l > 0 {
@@ -41,7 +39,7 @@ func (self *Queue) ResetFailed() error {
 	return answer.Err()
 }
 
-//Statistics
+// Statistics
 func (self *Queue) GetInputLength() int64 {
 	l := self.redisClient.LLen(self.InputName())
 	return l.Val()

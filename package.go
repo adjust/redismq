@@ -10,7 +10,7 @@ import (
 type Package struct {
 	Payload    string
 	CreatedAt  time.Time
-	Queue      *Queue      `json:"-"`
+	Queue      interface{} `json:"-"`
 	Consumer   *Consumer   `json:"-"`
 	Collection *[]*Package `json:"-"`
 	Acked      bool        `json:"-"`

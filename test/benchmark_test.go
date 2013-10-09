@@ -3,8 +3,8 @@ package main
 import (
 	//"fmt"
 	"github.com/adeven/goenv"
-	"github.com/adeven/redismq"
 	. "github.com/matttproud/gocheck"
+	"github.com/adeven/redismq"
 	"math/rand"
 	"runtime"
 	"strconv"

@@ -2,16 +2,15 @@ package redismq
 
 import (
 	"fmt"
-	"time"
 )
 
 //Consumers are Watchers that have writing commands
 type Consumer struct {
-	Broker
+	*Broker
 }
 
 func (self *Queue) AddConsumer(name string) (c *Consumer, err error) {
-	c = &Consumer{Broker{Name: name, Queue: self}}
+	c = &Consumer{&Broker{Name: name, Queue: self}}
 	//check uniqueness and start heartbeat
 	added := self.redisClient.SAdd(self.WorkerKey(), name).Val()
 	if added == 0 {
@@ -20,19 +19,10 @@ func (self *Queue) AddConsumer(name string) (c *Consumer, err error) {
 			return nil, fmt.Errorf("consumer with this name is already active!")
 		}
 	}
-	c.StartHeartbeat()
+	c.startHeartbeat()
 	return c, nil
 }
 
-func (self *Broker) HeartbeatName() string {
+func (self *Consumer) HeartbeatName() string {
 	return self.WorkingName() + "::heartbeat"
-}
-
-func (self *Consumer) StartHeartbeat() {
-	go func() {
-		for {
-			self.Queue.redisClient.SetEx(self.HeartbeatName(), 1, "ping")
-			time.Sleep(500 * time.Millisecond)
-		}
-	}()
 }
