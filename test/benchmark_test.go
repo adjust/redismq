@@ -90,7 +90,7 @@ func (suite *BenchmarkSuite) BenchmarkSingleCon1k(c *C) {
 func (suite *BenchmarkSuite) BenchmarkSingleConMulti1k(c *C) {
 	for i := 0; i < c.N; i++ {
 		p, _ := suite.consumer1k.MultiGet(100)
-		p[99].MutliAck()
+		p[99].MultiAck()
 	}
 }
 

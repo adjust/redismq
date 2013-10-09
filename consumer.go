@@ -2,7 +2,6 @@ package redismq
 
 import (
 	"fmt"
-	"github.com/adeven/redis"
 	"time"
 )
 
@@ -36,15 +35,4 @@ func (self *Consumer) StartHeartbeat() {
 			time.Sleep(500 * time.Millisecond)
 		}
 	}()
-}
-
-func (self *Consumer) parseRedisAnswer(answer *redis.StringReq) (*Package, error) {
-	if answer.Err() != nil {
-		return nil, answer.Err()
-	}
-	p, err := UnmarshalPackage(answer.Val(), self.Queue, self)
-	if err != nil {
-		return nil, err
-	}
-	return p, nil
 }
