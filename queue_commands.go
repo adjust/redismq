@@ -1,15 +1,18 @@
 package redismq
 
 import (
+	"github.com/adeven/redis"
 	"strconv"
 	"time"
 )
 
 func (self *Queue) Put(payload string) error {
 	p := &Package{CreatedAt: time.Now(), Payload: payload, Queue: self}
-	answer := self.redisClient.LPush(self.InputName(), p.GetString())
-	self.redisClient.Incr(self.InputCounterName())
-	return answer.Err()
+	_, err := self.redisClient.Pipelined(func(c *redis.PipelineClient) {
+		c.LPush(self.InputName(), p.GetString())
+		c.Incr(self.InputCounterName())
+	})
+	return err
 }
 
 //TODO MultiPut?

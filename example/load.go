@@ -15,11 +15,8 @@ func main() {
 	server := redismq.NewServer(goenv, over)
 	go server.Start()
 	go write("example")
-	go write("example2")
 	go read("example", "1")
 	go read("example", "2")
-	go read("example2", "1")
-	go read("example2", "2")
 	//go read("3")
 	select {}
 }

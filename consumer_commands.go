@@ -2,6 +2,7 @@ package redismq
 
 import (
 	"fmt"
+	"github.com/adeven/redis"
 )
 
 func (self *Consumer) Get() (*Package, error) {
@@ -12,8 +13,13 @@ func (self *Consumer) Get() (*Package, error) {
 }
 
 func (self *Consumer) unsafeGet() (*Package, error) {
-	answer := self.GetQueue().redisClient.BRPopLPush(self.GetQueue().InputName(), self.WorkingName(), 0)
-	self.GetQueue().redisClient.Incr(self.WorkingCounterName())
+	var answer *redis.StringReq
+
+	self.GetQueue().redisClient.Pipelined(func(c *redis.PipelineClient) {
+		answer = c.BRPopLPush(self.GetQueue().InputName(), self.WorkingName(), 0)
+		c.Incr(self.WorkingCounterName())
+	})
+
 	return self.parseRedisAnswer(answer)
 }
 
@@ -43,27 +49,38 @@ func (self *Consumer) GetUnacked() (*Package, error) {
 }
 
 func (self *Consumer) GetFailed() (*Package, error) {
-	answer := self.GetQueue().redisClient.RPopLPush(self.GetQueue().FailedName(), self.WorkingName())
-	self.GetQueue().redisClient.Incr(self.WorkingCounterName())
+	var answer *redis.StringReq
+
+	self.GetQueue().redisClient.Pipelined(func(c *redis.PipelineClient) {
+		answer = c.RPopLPush(self.GetQueue().FailedName(), self.WorkingName())
+		c.Incr(self.WorkingCounterName())
+	})
+
 	return self.parseRedisAnswer(answer)
 }
 
 func (self *Consumer) AckPackage(p *Package) error {
-	answer := self.GetQueue().redisClient.RPop(self.WorkingName())
-	self.GetQueue().redisClient.Incr(self.AckCounterName())
-	return answer.Err()
+	_, err := self.GetQueue().redisClient.Pipelined(func(c *redis.PipelineClient) {
+		c.RPop(self.WorkingName())
+		c.Incr(self.AckCounterName())
+	})
+	return err
 }
 
 func (self *Consumer) RequeuePackage(p *Package) error {
-	answer := self.GetQueue().redisClient.RPopLPush(self.WorkingName(), self.GetQueue().InputName())
-	self.GetQueue().redisClient.Incr(self.GetQueue().InputCounterName())
-	return answer.Err()
+	_, err := self.GetQueue().redisClient.Pipelined(func(c *redis.PipelineClient) {
+		c.RPopLPush(self.WorkingName(), self.GetQueue().InputName())
+		c.Incr(self.GetQueue().InputCounterName())
+	})
+	return err
 }
 
 func (self *Consumer) FailPackage(p *Package) error {
-	answer := self.GetQueue().redisClient.RPopLPush(self.WorkingName(), self.GetQueue().FailedName())
-	self.GetQueue().redisClient.Incr(self.GetQueue().FailedCounterName())
-	return answer.Err()
+	_, err := self.GetQueue().redisClient.Pipelined(func(c *redis.PipelineClient) {
+		c.RPopLPush(self.WorkingName(), self.GetQueue().FailedName())
+		c.Incr(self.GetQueue().FailedCounterName())
+	})
+	return err
 }
 
 func (self *Consumer) ResetWorking() error {
