@@ -10,7 +10,7 @@ import (
 type Package struct {
 	Payload    string
 	CreatedAt  time.Time
-	Queue      *Queue      `json:"-"`
+	Queue      interface{} `json:"-"`
 	Consumer   *Consumer   `json:"-"`
 	Collection *[]*Package `json:"-"`
 	Acked      bool        `json:"-"`
@@ -52,7 +52,7 @@ func (self *Package) Index() int {
 }
 
 //TODO write in lua
-func (self *Package) MutliAck() (err error) {
+func (self *Package) MultiAck() (err error) {
 	if self.Collection == nil {
 		return fmt.Errorf("cannot MultiAck single package")
 	}

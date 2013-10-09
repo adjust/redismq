@@ -2,6 +2,8 @@ package redismq
 
 import (
 	"fmt"
+	"github.com/adeven/redis"
+	"time"
 )
 
 func (self *Consumer) Get() (*Package, error) {
@@ -12,8 +14,13 @@ func (self *Consumer) Get() (*Package, error) {
 }
 
 func (self *Consumer) unsafeGet() (*Package, error) {
-	answer := self.GetQueue().redisClient.BRPopLPush(self.GetQueue().InputName(), self.WorkingName(), 0)
-	self.GetQueue().redisClient.Incr(self.WorkingCounterName())
+	var answer *redis.StringReq
+
+	self.GetQueue().redisClient.Pipelined(func(c *redis.PipelineClient) {
+		answer = c.BRPopLPush(self.GetQueue().InputName(), self.WorkingName(), 0)
+		c.Incr(self.WorkingCounterName())
+	})
+
 	return self.parseRedisAnswer(answer)
 }
 
@@ -23,14 +30,37 @@ func (self *Consumer) MultiGet(length int) ([]*Package, error) {
 	if self.HasUnacked() {
 		return nil, fmt.Errorf("unacked Packages found!")
 	}
-	for i := 0; i < length; i++ {
-		p, err := self.unsafeGet()
-		if err != nil {
-			return nil, err
+
+	//TODO maybe use transactions for rollback in case of errors?
+	reqs, err := self.GetQueue().redisClient.Pipelined(func(c *redis.PipelineClient) {
+		c.BRPopLPush(self.GetQueue().InputName(), self.WorkingName(), 0)
+		for i := 1; i < length; i++ {
+			c.RPopLPush(self.GetQueue().InputName(), self.WorkingName())
 		}
-		p.Collection = &collection
-		collection = append(collection, p)
+
+	})
+	if err != nil {
+		return nil, err
 	}
+
+	for _, answer := range reqs {
+		switch answer := answer.(type) {
+		default:
+			return nil, err
+		case *redis.StringReq:
+			if answer.Val() == "" {
+				continue
+			}
+			p, err := self.parseRedisAnswer(answer)
+			if err != nil {
+				return nil, err
+			}
+			p.Collection = &collection
+			collection = append(collection, p)
+		}
+	}
+	self.GetQueue().redisClient.IncrBy(self.WorkingCounterName(), int64(length))
+
 	return collection, nil
 }
 
@@ -43,30 +73,61 @@ func (self *Consumer) GetUnacked() (*Package, error) {
 }
 
 func (self *Consumer) GetFailed() (*Package, error) {
-	answer := self.GetQueue().redisClient.RPopLPush(self.GetQueue().FailedName(), self.WorkingName())
-	self.GetQueue().redisClient.Incr(self.WorkingCounterName())
+	var answer *redis.StringReq
+
+	self.GetQueue().redisClient.Pipelined(func(c *redis.PipelineClient) {
+		answer = c.RPopLPush(self.GetQueue().FailedName(), self.WorkingName())
+		c.Incr(self.WorkingCounterName())
+	})
+
 	return self.parseRedisAnswer(answer)
 }
 
 func (self *Consumer) AckPackage(p *Package) error {
-	answer := self.GetQueue().redisClient.RPop(self.WorkingName())
-	self.GetQueue().redisClient.Incr(self.AckCounterName())
-	return answer.Err()
+	_, err := self.GetQueue().redisClient.Pipelined(func(c *redis.PipelineClient) {
+		c.RPop(self.WorkingName())
+		c.Incr(self.AckCounterName())
+	})
+	return err
 }
 
 func (self *Consumer) RequeuePackage(p *Package) error {
-	answer := self.GetQueue().redisClient.RPopLPush(self.WorkingName(), self.GetQueue().InputName())
-	self.GetQueue().redisClient.Incr(self.GetQueue().InputCounterName())
-	return answer.Err()
+	_, err := self.GetQueue().redisClient.Pipelined(func(c *redis.PipelineClient) {
+		c.RPopLPush(self.WorkingName(), self.GetQueue().InputName())
+		c.Incr(self.GetQueue().InputCounterName())
+	})
+	return err
 }
 
 func (self *Consumer) FailPackage(p *Package) error {
-	answer := self.GetQueue().redisClient.RPopLPush(self.WorkingName(), self.GetQueue().FailedName())
-	self.GetQueue().redisClient.Incr(self.GetQueue().FailedCounterName())
-	return answer.Err()
+	_, err := self.GetQueue().redisClient.Pipelined(func(c *redis.PipelineClient) {
+		c.RPopLPush(self.WorkingName(), self.GetQueue().FailedName())
+		c.Incr(self.GetQueue().FailedCounterName())
+	})
+	return err
 }
 
 func (self *Consumer) ResetWorking() error {
 	answer := self.GetQueue().redisClient.Del(self.WorkingName())
 	return answer.Err()
+}
+
+func (self *Consumer) startHeartbeat() {
+	go func() {
+		for {
+			self.Queue.redisClient.SetEx(self.HeartbeatName(), 1, "ping")
+			time.Sleep(500 * time.Millisecond)
+		}
+	}()
+}
+
+func (self *Consumer) parseRedisAnswer(answer *redis.StringReq) (*Package, error) {
+	if answer.Err() != nil {
+		return nil, answer.Err()
+	}
+	p, err := UnmarshalPackage(answer.Val(), self.Queue, self)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
 }

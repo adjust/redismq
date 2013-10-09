@@ -1,20 +1,21 @@
 package redismq
 
 import (
+	"github.com/adeven/redis"
 	"strconv"
 	"time"
 )
 
 func (self *Queue) Put(payload string) error {
 	p := &Package{CreatedAt: time.Now(), Payload: payload, Queue: self}
-	answer := self.redisClient.LPush(self.InputName(), p.GetString())
-	self.redisClient.Incr(self.InputCounterName())
-	return answer.Err()
+	_, err := self.redisClient.Pipelined(func(c *redis.PipelineClient) {
+		c.LPush(self.InputName(), p.GetString())
+		c.Incr(self.InputCounterName())
+	})
+	return err
 }
 
-//TODO MultiPut?
-
-//TODO implement this in lua
+// TODO implement this in lua
 func (self *Queue) RequeueFailed() error {
 	l := self.GetFailedLength()
 	for l > 0 {
@@ -38,7 +39,7 @@ func (self *Queue) ResetFailed() error {
 	return answer.Err()
 }
 
-//Statistics
+// Statistics
 func (self *Queue) GetInputLength() int64 {
 	l := self.redisClient.LLen(self.InputName())
 	return l.Val()
