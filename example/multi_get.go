@@ -15,9 +15,11 @@ func main() {
 	server := redismq.NewServer(goenv, over)
 	go server.Start()
 	go write("example")
+	go write("example")
+
 	go read("example", "1")
 	go read("example", "2")
-	//go read("3")
+
 	select {}
 }
 
@@ -51,11 +53,11 @@ func read(queue, prefix string) {
 	}
 	consumer.ResetWorking()
 	for {
-		p, err := consumer.Get()
+		p, err := consumer.MultiGet(200)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		err = p.Ack()
+		p[len(p)-1].MultiAck()
 	}
 }
