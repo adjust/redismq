@@ -1,8 +1,189 @@
-## redismq
+# redismq
 
-check out: [http://big-elephants.com/2013-09/building-a-message-queue-using-redis-in-go/](http://big-elephants.com/2013-09/building-a-message-queue-using-redis-in-go/)
+## What is this
 
-better readme will follow soon.
+This is a fast, persistent, atomic message queue implementation that uses redis as its storage engine written in go.
+It uses atomic list commands to ensure that messages are delivered only once in the right order without being lost by crashing consumers.
+
+Details can be found in the blog post about its initial design:
+[http://big-elephants.com/2013-09/building-a-message-queue-using-redis-in-go/](http://big-elephants.com/2013-09/building-a-message-queue-using-redis-in-go/)
+
+## What it's not
+
+It's not a standalone server that you can use as a message queue, at least not for now. The implementation is done purely client side. All message queue commands are "translated" into redis commands and then executed via a redis client.
+
+If you want to use this with any other language than go you have to translate all of the commands into your language of choice.
+
+## How to use it
+
+All most all use cases are either covered in the [examples](https://github.com/adeven/redismq/tree/master/example)
+or in the [tests](https://github.com/adeven/redismq/tree/master/test).
+
+So the best idea is just to read those and figure it from there. But in any case:
+
+### Basics
+
+First off checkout [goenv](https://github.com/adeven/goenv), because redismq uses it and doesn't work without it.
+Once you figured out your `config.yml` you just need to define a new queue:
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/adeven/goenv"
+	"github.com/adeven/redismq"
+)
+
+func main() {
+	goenv := goenv.DefaultGoenv()
+	testQueue := redismq.NewQueue(goenv, "clicks")
+	...
+}
+```
+To write into the queue you simply use `Put()`:
+```go
+	...
+	testQueue := redismq.NewQueue(goenv, "clicks")
+	testQueue.Put("testpayload")
+	...
+}
+```
+The payload can be any kind of string, yes even a [10MB one](https://github.com/adeven/redismq/blob/master/test/integration_test.go#L217).
+
+To get messages out of the queue you need a consumer:
+```go
+	...
+	consumer, err := testQueue.AddConsumer("testconsumer")
+	if err != nil {
+		panic(err)
+	}
+	package, err := consumer.Get()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(package.Payload)
+	...
+}
+```
+`Payload` will hold the original string, while `package` will have some additional header information.
+
+To remove a package from the queue you have to `Ack()` it:
+```go
+	...
+	package, err := consumer.Get()
+	if err != nil {
+		panic(err)
+	}
+	err = package.Ack()
+	if err != nil {
+		panic(err)
+	}
+	...
+}
+```
+
+### Buffered Queues
+
+When input speed is of the essence `BufferedQueues` will scratch that itch.
+They pipeline multiple puts into one fast operation. The only issue is that upon crashing or restart the packages in
+the buffer that haven't been written yet will be lost. So it's advised to wait one second before terminating your program to flush the buffer.
+
+The usage is as easy as it gets:
+```go
+	...
+	bufferSize := 100
+	testQueue := redismq.NewBufferedQueue(goenv, "clicks", bufferSize)
+	...
+}
+```
+`Put()` and `Get()` stay exactly the same.
+I have found anything over 200 as `bufferSize` not to increase performance any further.
+
+### Multi Get
+
+Like `BufferedQueues` for `Get()` `MultiGet()` speeds up the fetching of messages. The good news it comes without the buffer loss issues.
+
+Usage is pretty straight forward with the only difference being the `MultiAck()`:
+```go
+	...
+	packages, err := consumer.MultiGet(100)
+	if err != nil {
+		panic(err)
+	}
+	for i := range packages {
+		fmt.Println(p[i].Payload)
+	}
+	packages[len(p)-1].MultiAck()
+	...
+}
+```
+`MultiAck()` can be called on any package in the array with all the prior packages being "acked". This way you can `Reject()` single packages.
+
+### Reject and Failed Queues
+
+Similar to AMQP redismq supports `Failed Queues` meaning that packages that are rejected by a consumer will be stored in separate queue for further inspection. Alternatively a consumer can also `Reject()` a package and put it back into the queue:
+```go
+	...
+	package, err := consumer.Get()
+	if err != nil {
+		panic(err)
+	}
+	err = package.Reject(true)
+	if err != nil {
+		panic(err)
+	}
+	...
+}
+```
+
+To push the message into the `Failed Queue` of this consumer simply set the `requeue` flag to false:
+```go
+	...
+	package, err := consumer.Get()
+	if err != nil {
+		panic(err)
+	}
+	err = package.Reject(false)
+	if err != nil {
+		panic(err)
+	}
+	package, err = suite.consumer.GetUnacked()
+	...
+}
+```
+As you can see there is also a command to get messages from the `Failed Queue`.
+
+This should cover the basic use cases, if you want to know more just study the `*_commands.go`.
+
+## How fast is it
+
+Even though the original implementation wasn't aiming for high speeds the addition of `BufferedQueues` and `MultiGet`
+make it go something like [this](http://www.youtube.com/watch?feature=player_detailpage&v=sGBMSLvggqA#t=58).
+
+All of the following benchmarks were conducted on a MacBook Retina with a 2.4 GHz i7.
+The InputRate is the number of messages per second that get inserted, WorkRate the messages per second consumed.
+
+Single Publisher, Two Consumers only atomic `Get` and `Put`
+```
+InputRate:	10946
+WorkRate:	7421
+```
+
+Single Publisher, Two Consumers using `BufferedQueues` and `MultiGet`
+```
+InputRate:	37700
+WorkRate:	21500
+```
+
+And yes that is a persistent message queue that can move almost 60k messages per second.
+
+If you want to find out for yourself checkout the `example` folder. The `load.go` or `buffered_queue.go`
+will start a web server that will display performance stats under `http://localhost:9999/stats`.
+
+## How persistent is it
+
+As redis is the underlying storage engine you can set your desired persistence somewhere between YOLO and fsync().
+With somewhat sane settings you should see no significant performance decrease.
 
 ## Copyright
 redismq is Copyright © 2013 adeven (Paul H. Müller). It is free software, and may be redistributed under the terms
