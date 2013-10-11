@@ -1,5 +1,7 @@
 # redismq
 
+[![Build Status](https://secure.travis-ci.org/adeven/redismq.png)](http://travis-ci.org/adeven/redismq)
+
 ## What is this
 
 This is a fast, persistent, atomic message queue implementation that uses redis as its storage engine written in go.

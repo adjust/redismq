@@ -14,6 +14,12 @@ gotesting:
     redis:
         db: 9
 
+travis:
+    log_file: ../test/log/redismq.log
+    redis:
+        db: 1
+        port: 6379
+
 testing:
     log_file: ./log/redismq.log
     redis:

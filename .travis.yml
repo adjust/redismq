@@ -1,0 +1,19 @@
+language: go
+
+go:
+  - 1.0
+  - 1.1
+
+services:
+  - redis
+
+env:
+  - GO_ENV=travis
+
+script: go test -v ./test
+
+install:
+  - go get -u github.com/adeven/redis
+  - go get -u github.com/adeven/goenv
+  - go get -u github.com/matttproud/gocheck
+  - mkdir ./example/log
