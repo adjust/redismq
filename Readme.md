@@ -25,27 +25,25 @@ So the best idea is just to read those and figure it from there. But in any case
 
 ### Basics
 
-First off checkout [goenv](https://github.com/adeven/goenv), because redismq uses it and doesn't work without it.
-Once you figured out your `config.yml` you just need to define a new queue:
+To get started you need a running redis server. Since the tests run `FlushDB()` an otherwise unused database is highly recommended
+The first step is to create a new queue:
 ```go
 package main
 
 import (
 	"fmt"
-	"github.com/adeven/goenv"
 	"github.com/adeven/redismq"
 )
 
 func main() {
-	goenv := goenv.DefaultGoenv()
-	testQueue := redismq.NewQueue(goenv, "clicks")
+	testQueue := redismq.NewQueue("localhost:6379", "", int64(9), "clicks")
 	...
 }
 ```
 To write into the queue you simply use `Put()`:
 ```go
 	...
-	testQueue := redismq.NewQueue(goenv, "clicks")
+	testQueue := redismq.NewQueue("localhost:6379", "", int64(9), "clicks")
 	testQueue.Put("testpayload")
 	...
 }
@@ -94,7 +92,7 @@ The usage is as easy as it gets:
 ```go
 	...
 	bufferSize := 100
-	testQueue := redismq.NewBufferedQueue(goenv, "clicks", bufferSize)
+	testQueue := redismq.NewBufferedQueue("localhost:6379", "", int64(9), "clicks", bufferSize)
 	...
 }
 ```

@@ -2,9 +2,8 @@ package main
 
 import (
 	//"fmt"
-	"github.com/adeven/goenv"
-	. "github.com/matttproud/gocheck"
 	"github.com/adeven/redismq"
+	. "github.com/matttproud/gocheck"
 	"math/rand"
 	"runtime"
 	"strconv"
@@ -13,7 +12,6 @@ import (
 )
 
 type BenchmarkSuite struct {
-	goenv           *goenv.Goenv
 	queue1k         *redismq.Queue
 	queue4k         *redismq.Queue
 	consumer1k      *redismq.Consumer
@@ -27,15 +25,14 @@ var _ = Suite(&BenchmarkSuite{})
 func (suite *BenchmarkSuite) SetUpSuite(c *C) {
 	runtime.GOMAXPROCS(8)
 	rand.Seed(time.Now().UTC().UnixNano())
-	suite.goenv = goenv.NewGoenv("../example/config.yml", "gotesting", "../example/log/test.log")
-	suite.queue1k = redismq.NewQueue(suite.goenv, "teststuff1k")
-	suite.queue4k = redismq.NewQueue(suite.goenv, "teststuff4k")
+	suite.queue1k = redismq.NewQueue(redisUrl, redisPassword, redisDb, "teststuff1k")
+	suite.queue4k = redismq.NewQueue(redisUrl, redisPassword, redisDb, "teststuff4k")
 	suite.consumer1k, _ = suite.queue1k.AddConsumer("testconsumer")
 	suite.consumer4k, _ = suite.queue4k.AddConsumer("testconsumer")
 
 	suite.mutliConsumer1k = make([]*redismq.Consumer, 0)
 	for i := 0; i < 4; i++ {
-		q := redismq.NewQueue(suite.goenv, "teststuff1k")
+		q := redismq.NewQueue(redisUrl, redisPassword, redisDb, "teststuff1k")
 		c, err := q.AddConsumer("c" + strconv.Itoa(i))
 		if err != nil {
 			panic(err)
@@ -44,7 +41,7 @@ func (suite *BenchmarkSuite) SetUpSuite(c *C) {
 	}
 	suite.mutliConsumer4k = make([]*redismq.Consumer, 0)
 	for i := 0; i < 4; i++ {
-		q := redismq.NewQueue(suite.goenv, "teststuff4k")
+		q := redismq.NewQueue(redisUrl, redisPassword, redisDb, "teststuff4k")
 		c, err := q.AddConsumer("c" + strconv.Itoa(i))
 		if err != nil {
 			panic(err)

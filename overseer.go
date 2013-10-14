@@ -2,16 +2,17 @@ package redismq
 
 import (
 	"encoding/json"
-	"github.com/adeven/goenv"
 	"github.com/adeven/redis"
 	"log"
 	"time"
 )
 
 type Overseer struct {
-	redisClient *redis.Client
-	goenv       *goenv.Goenv
-	Stats       map[string]*QueueStat
+	redisClient   *redis.Client
+	RedisUrl      string
+	RedisPassword string
+	RedisDb       int64
+	Stats         map[string]*QueueStat
 }
 
 type QueueStat struct {
@@ -32,10 +33,14 @@ type ConsumerStat struct {
 }
 
 //TODO Test this?
-func NewOverseer(goenv *goenv.Goenv) *Overseer {
-	q := &Overseer{goenv: goenv, Stats: make(map[string]*QueueStat)}
-	host, port, db := goenv.GetRedis()
-	q.redisClient = redis.NewTCPClient(host+":"+port, "", int64(db))
+func NewOverseer(redisUrl, redisPassword string, redisDb int64) *Overseer {
+	q := &Overseer{
+		RedisUrl:      redisUrl,
+		RedisPassword: redisPassword,
+		RedisDb:       redisDb,
+		Stats:         make(map[string]*QueueStat),
+	}
+	q.redisClient = redis.NewTCPClient(redisUrl, redisPassword, redisDb)
 	go q.WatchAllQueues()
 	return q
 }
@@ -57,7 +62,7 @@ func (self *Overseer) GetAllQueues() (queues []*Queue) {
 		return
 	}
 	for _, name := range answer.Val() {
-		queues = append(queues, NewQueue(self.goenv, name))
+		queues = append(queues, NewQueue(self.RedisUrl, self.RedisPassword, self.RedisDb, name))
 	}
 	return
 }

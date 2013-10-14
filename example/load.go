@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/adeven/goenv"
 	"github.com/adeven/redismq"
 	"log"
 	"math/rand"
@@ -10,9 +9,8 @@ import (
 
 func main() {
 	runtime.GOMAXPROCS(5)
-	goenv := goenv.DefaultGoenv()
-	over := redismq.NewOverseer(goenv)
-	server := redismq.NewServer(goenv, over)
+	over := redismq.NewOverseer("localhost:6379", "", int64(9))
+	server := redismq.NewServer("9999", over)
 	go server.Start()
 	go write("example")
 	go read("example", "1")
@@ -34,8 +32,7 @@ func randInt(min int, max int) int {
 }
 
 func write(queue string) {
-	goenv := goenv.DefaultGoenv()
-	testQueue := redismq.NewQueue(goenv, queue)
+	testQueue := redismq.NewQueue("localhost:6379", "", int64(9), queue)
 	payload := randomString(1024 * 1) //adjust for size
 	for {
 		testQueue.Put(payload)
@@ -43,8 +40,7 @@ func write(queue string) {
 }
 
 func read(queue, prefix string) {
-	goenv := goenv.DefaultGoenv()
-	testQueue := redismq.NewQueue(goenv, queue)
+	testQueue := redismq.NewQueue("localhost:6379", "", int64(9), queue)
 	consumer, err := testQueue.AddConsumer("testconsumer" + prefix)
 	if err != nil {
 		panic(err)

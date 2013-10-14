@@ -2,13 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/adeven/goenv"
 	"github.com/adeven/redismq"
 )
 
 func main() {
-	goenv := goenv.DefaultGoenv()
-	testQueue := redismq.NewQueue(goenv, "clicks")
+	testQueue := redismq.NewQueue("localhost:6379", "", int64(9), "clicks")
 	for i := 0; i < 10; i++ {
 		testQueue.Put("testpayload")
 	}
