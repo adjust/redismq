@@ -7,9 +7,6 @@ go:
 services:
   - redis
 
-env:
-  - GO_ENV=travis
-
 script: go test -v ./test
 
 install:
