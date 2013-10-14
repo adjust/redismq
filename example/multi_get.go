@@ -9,7 +9,7 @@ import (
 
 func main() {
 	runtime.GOMAXPROCS(5)
-	over := redismq.NewOverseer("localhost:6379", "", int64(9))
+	over := redismq.NewOverseer("localhost:6379", "", 9)
 	server := redismq.NewServer("9999", over)
 	go server.Start()
 	go write("example")
@@ -34,7 +34,7 @@ func randInt(min int, max int) int {
 }
 
 func write(queue string) {
-	testQueue := redismq.NewQueue("localhost:6379", "", int64(9), queue)
+	testQueue := redismq.NewQueue("localhost:6379", "", 9, queue)
 	payload := randomString(1024 * 1) //adjust for size
 	for {
 		testQueue.Put(payload)
@@ -42,7 +42,7 @@ func write(queue string) {
 }
 
 func read(queue, prefix string) {
-	testQueue := redismq.NewQueue("localhost:6379", "", int64(9), queue)
+	testQueue := redismq.NewQueue("localhost:6379", "", 9, queue)
 	consumer, err := testQueue.AddConsumer("testconsumer" + prefix)
 	if err != nil {
 		panic(err)

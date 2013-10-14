@@ -353,6 +353,19 @@ func (suite *TestSuite) TestBufferedQueueNoWait(c *C) {
 	c.Check(consumer.GetUnackedLength(), Equals, int64(0))
 }
 
+// should flush buffered queue upon call
+func (suite *TestSuite) TestBufferedFlush(c *C) {
+	q, err := redismq.NewBufferedQueue(redisUrl, redisPassword, redisDb, "buffered_test2", 1000)
+	c.Assert(err, Equals, nil)
+
+	for i := 0; i < 999; i++ {
+		c.Check(q.Put("testpayload"), Equals, nil)
+	}
+	c.Check(len(q.Buffer), Not(Equals), 0)
+	q.FlushBuffer()
+	c.Check(len(q.Buffer), Equals, 0)
+}
+
 // TODO write stats watcher
 // should get numbers of consumers
 

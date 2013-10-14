@@ -36,14 +36,14 @@ import (
 )
 
 func main() {
-	testQueue := redismq.NewQueue("localhost:6379", "", int64(9), "clicks")
+	testQueue := redismq.NewQueue("localhost:6379", "", 9, "clicks")
 	...
 }
 ```
 To write into the queue you simply use `Put()`:
 ```go
 	...
-	testQueue := redismq.NewQueue("localhost:6379", "", int64(9), "clicks")
+	testQueue := redismq.NewQueue("localhost:6379", "", 9, "clicks")
 	testQueue.Put("testpayload")
 	...
 }
@@ -92,7 +92,7 @@ The usage is as easy as it gets:
 ```go
 	...
 	bufferSize := 100
-	testQueue := redismq.NewBufferedQueue("localhost:6379", "", int64(9), "clicks", bufferSize)
+	testQueue := redismq.NewBufferedQueue("localhost:6379", "", 9, "clicks", bufferSize)
 	...
 }
 ```

@@ -4,6 +4,9 @@ go:
   - 1.0
   - 1.1
 
+notifications:
+  email: false
+
 services:
   - redis
 
