@@ -1,20 +1,18 @@
 package redismq
 
 import (
-	"github.com/adeven/goenv"
 	"log"
 	"net/http"
 )
 
 type Server struct {
-	goenv    *goenv.Goenv
 	port     string
 	Overseer *Overseer
 }
 
-func NewServer(goenv *goenv.Goenv, overseer *Overseer) *Server {
+func NewServer(port string, overseer *Overseer) *Server {
 	s := &Server{
-		port:     goenv.GetPort(),
+		port:     port,
 		Overseer: overseer,
 	}
 	return s

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/adeven/goenv"
 	"github.com/adeven/redismq"
 	"log"
 	"math/rand"
@@ -11,11 +10,10 @@ import (
 // This example demonstrates maximum performance
 func main() {
 	runtime.GOMAXPROCS(5)
-	goenv := goenv.DefaultGoenv()
-	over := redismq.NewOverseer(goenv)
-	server := redismq.NewServer(goenv, over)
+	over := redismq.NewOverseer("localhost:6379", "", int64(9))
+	server := redismq.NewServer("9999", over)
 	go server.Start()
-	testQueue, err := redismq.NewBufferedQueue(goenv, "example", 100)
+	testQueue, err := redismq.NewBufferedQueue("localhost:6379", "", int64(9), "example", 100)
 	if err != nil {
 		panic(err)
 	}

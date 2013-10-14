@@ -2,7 +2,6 @@ package main
 
 import (
 	// "fmt"
-	"github.com/adeven/goenv"
 	"github.com/adeven/redis"
 	"github.com/adeven/redismq"
 	. "github.com/matttproud/gocheck"
@@ -15,25 +14,27 @@ import (
 func Test(t *testing.T) { TestingT(t) }
 
 type TestSuite struct {
-	goenv       *goenv.Goenv
 	queue       *redismq.Queue
 	consumer    *redismq.Consumer
 	redisClient *redis.Client
 }
 
-var _ = Suite(&TestSuite{})
+var (
+	redisUrl      = "localhost:6379"
+	redisPassword = ""
+	redisDb       = int64(9)
+	_             = Suite(&TestSuite{})
+)
 
 func (suite *TestSuite) SetUpSuite(c *C) {
 	runtime.GOMAXPROCS(8)
 	rand.Seed(time.Now().UTC().UnixNano())
-	suite.goenv = goenv.NewGoenv("../example/config.yml", "gotesting", "../example/log/test.log")
-	host, port, db := suite.goenv.GetRedis()
-	suite.redisClient = redis.NewTCPClient(host+":"+port, "", int64(db))
+	suite.redisClient = redis.NewTCPClient(redisUrl, redisPassword, redisDb)
 }
 
 func (suite *TestSuite) SetUpTest(c *C) {
 	suite.redisClient.FlushDb()
-	suite.queue = redismq.NewQueue(suite.goenv, "teststuff")
+	suite.queue = redismq.NewQueue(redisUrl, redisPassword, redisDb, "teststuff")
 	suite.consumer, _ = suite.queue.AddConsumer("testconsumer")
 }
 
@@ -190,7 +191,7 @@ func (suite *TestSuite) TestGetFailed(c *C) {
 
 // should handle multiple queues
 func (suite *TestSuite) TestSecondQueue(c *C) {
-	secondQueue := redismq.NewQueue(suite.goenv, "teststuff2")
+	secondQueue := redismq.NewQueue(redisUrl, redisPassword, redisDb, "teststuff2")
 	secondConsumer, err := secondQueue.AddConsumer("testconsumer")
 	c.Assert(err, Equals, nil)
 
@@ -305,16 +306,16 @@ func (suite *TestSuite) TestMultiGetNoWait(c *C) {
 
 // should not allow two buffered queues with the same name
 func (suite *TestSuite) TestUniqueBufferedQueue(c *C) {
-	_, err := redismq.NewBufferedQueue(suite.goenv, "buffered_test", 100)
+	_, err := redismq.NewBufferedQueue(redisUrl, redisPassword, redisDb, "buffered_test", 100)
 	c.Check(err, Equals, nil)
 
-	_, err = redismq.NewBufferedQueue(suite.goenv, "buffered_test", 100)
+	_, err = redismq.NewBufferedQueue(redisUrl, redisPassword, redisDb, "buffered_test", 100)
 	c.Check(err.Error(), Equals, "buffered queue with this name is already active!")
 }
 
 // should be able to put and get from buffered queue
 func (suite *TestSuite) TestBufferedQueue(c *C) {
-	q, err := redismq.NewBufferedQueue(suite.goenv, "buffered_test", 100)
+	q, err := redismq.NewBufferedQueue(redisUrl, redisPassword, redisDb, "buffered_test", 100)
 	c.Assert(err, Equals, nil)
 
 	for i := 0; i < 100; i++ {
@@ -336,7 +337,7 @@ func (suite *TestSuite) TestBufferedQueue(c *C) {
 
 // should not wait longer than 1 second to read from buffered queue
 func (suite *TestSuite) TestBufferedQueueNoWait(c *C) {
-	q, err := redismq.NewBufferedQueue(suite.goenv, "buffered_test", 100)
+	q, err := redismq.NewBufferedQueue(redisUrl, redisPassword, redisDb, "buffered_test", 100)
 	c.Assert(err, Equals, nil)
 
 	c.Check(q.Put("testpayload"), Equals, nil)
