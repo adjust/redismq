@@ -1,7 +1,6 @@
 package redismq
 
 import (
-	"github.com/adeven/goenv"
 	"github.com/adeven/redis"
 )
 
@@ -10,10 +9,9 @@ type Queue struct {
 	Name        string
 }
 
-func NewQueue(goenv *goenv.Goenv, name string) *Queue {
+func NewQueue(redisUrl, redisPassword string, redisDB int64, name string) *Queue {
 	q := &Queue{Name: name}
-	host, port, db := goenv.GetRedis()
-	q.redisClient = redis.NewTCPClient(host+":"+port, "", int64(db))
+	q.redisClient = redis.NewTCPClient(redisUrl, redisPassword, redisDB)
 	q.redisClient.SAdd(MasterQueueKey(), name)
 	return q
 }
