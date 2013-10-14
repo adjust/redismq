@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	testQueue := redismq.NewQueue("localhost:6379", "", int64(9), "clicks")
+	testQueue := redismq.NewQueue("localhost:6379", "", 9, "clicks")
 	for i := 0; i < 10; i++ {
 		testQueue.Put("testpayload")
 	}

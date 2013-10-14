@@ -11,6 +11,12 @@ func (self *BufferedQueue) Put(payload string) error {
 	return nil
 }
 
+func (self *BufferedQueue) Put(payload string) error {
+	p := &Package{CreatedAt: time.Now(), Payload: payload, Queue: self}
+	self.Buffer <- p
+	return nil
+}
+
 func (self *BufferedQueue) startWritingBufferToRedis() {
 	go func() {
 		nextWrite := time.Now().Unix()
