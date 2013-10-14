@@ -10,6 +10,9 @@ It uses atomic list commands to ensure that messages are delivered only once in 
 Details can be found in the blog post about its initial design:
 [http://big-elephants.com/2013-09/building-a-message-queue-using-redis-in-go/](http://big-elephants.com/2013-09/building-a-message-queue-using-redis-in-go/)
 
+A second article desribes the performance improvements of the current version:
+[http://big-elephants.com/2013-10/tuning-redismq-how-to-use-redis-in-go/](http://big-elephants.com/2013-10/tuning-redismq-how-to-use-redis-in-go/)
+
 ## What it's not
 
 It's not a standalone server that you can use as a message queue, at least not for now. The implementation is done purely client side. All message queue commands are "translated" into redis commands and then executed via a redis client.
@@ -98,6 +101,12 @@ The usage is as easy as it gets:
 ```
 `Put()` and `Get()` stay exactly the same.
 I have found anything over 200 as `bufferSize` not to increase performance any further.
+
+To ensure that no packages are left in the buffer when you shut down your program you need to call
+`FlushBuffer()` which will tell the queue to flush the buffer and wait till it's empty.
+```go
+	testQueue.FlushBuffer()
+```
 
 ### Multi Get
 

@@ -14,7 +14,12 @@ type BufferedQueue struct {
 }
 
 func NewBufferedQueue(redisUrl, redisPassword string, redisDB int64, name string, bufferSize int) (q *BufferedQueue, err error) {
-	q = &BufferedQueue{Queue: &Queue{Name: name}, BufferSize: bufferSize, Buffer: make(chan *Package, bufferSize), flushStatus: make(chan chan bool, 1)}
+	q = &BufferedQueue{
+		Queue:       &Queue{Name: name},
+		BufferSize:  bufferSize,
+		Buffer:      make(chan *Package, bufferSize),
+		flushStatus: make(chan chan bool, 1),
+	}
 	q.redisClient = redis.NewTCPClient(redisUrl, redisPassword, redisDB)
 	q.redisClient.SAdd(MasterQueueKey(), name)
 	val := q.redisClient.Get(q.HeartbeatName()).Val()

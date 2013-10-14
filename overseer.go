@@ -8,10 +8,10 @@ import (
 )
 
 type Overseer struct {
-	redisClient   *redis.Client
-	RedisUrl      string
-	RedisPassword string
-	RedisDb       int64
+	redisClient   *redis.Client `json:"-"`
+	RedisUrl      string        `json:"-"`
+	RedisPassword string        `json:"-"`
+	RedisDb       int64         `json:"-"`
 	Stats         map[string]*QueueStat
 }
 
