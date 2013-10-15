@@ -11,10 +11,11 @@ import (
 // Before terminating the queue should be flushed using FlushBuffer() to avoid package loss
 type BufferedQueue struct {
 	*Queue
-	BufferSize  int
-	Buffer      chan *Package
-	nextWrite   int64
-	flushStatus chan (chan bool)
+	BufferSize   int
+	Buffer       chan *Package
+	nextWrite    int64
+	flushStatus  chan (chan bool)
+	flushCommand chan bool
 }
 
 // NewBufferedQueue returns BufferedQueue.
@@ -22,10 +23,11 @@ type BufferedQueue struct {
 // Optimal BufferSize seems to be around 200.
 func NewBufferedQueue(redisURL, redisPassword string, redisDB int64, name string, bufferSize int) (q *BufferedQueue) {
 	q = &BufferedQueue{
-		Queue:       &Queue{Name: name},
-		BufferSize:  bufferSize,
-		Buffer:      make(chan *Package, bufferSize),
-		flushStatus: make(chan chan bool, 1),
+		Queue:        &Queue{Name: name},
+		BufferSize:   bufferSize,
+		Buffer:       make(chan *Package, bufferSize*2),
+		flushStatus:  make(chan chan bool, 1),
+		flushCommand: make(chan bool, bufferSize*2),
 	}
 	q.redisClient = redis.NewTCPClient(redisURL, redisPassword, redisDB)
 	return q
@@ -45,6 +47,7 @@ func (queue *BufferedQueue) Start() error {
 	}
 	queue.startHeartbeat()
 	queue.startWritingBufferToRedis()
+	queue.startPacemaker()
 	return nil
 }
 
@@ -52,6 +55,7 @@ func (queue *BufferedQueue) Start() error {
 func (queue *BufferedQueue) Put(payload string) error {
 	p := &Package{CreatedAt: time.Now(), Payload: payload, Queue: queue}
 	queue.Buffer <- p
+	queue.flushCommand <- true
 	return nil
 }
 
@@ -59,6 +63,7 @@ func (queue *BufferedQueue) Put(payload string) error {
 func (queue *BufferedQueue) FlushBuffer() {
 	flushing := make(chan bool, 1)
 	queue.flushStatus <- flushing
+	queue.flushCommand <- true
 	<-flushing
 	return
 }
@@ -67,7 +72,7 @@ func (queue *BufferedQueue) startWritingBufferToRedis() {
 	go func() {
 		queue.nextWrite = time.Now().Unix()
 		for {
-			if len(queue.Buffer) == cap(queue.Buffer) || time.Now().Unix() >= queue.nextWrite {
+			if len(queue.Buffer) >= queue.BufferSize || time.Now().Unix() >= queue.nextWrite {
 				size := len(queue.Buffer)
 				queue.redisClient.Pipelined(func(c *redis.PipelineClient) {
 					a := []string{}
@@ -84,9 +89,16 @@ func (queue *BufferedQueue) startWritingBufferToRedis() {
 				}
 				queue.nextWrite = time.Now().Unix() + 1
 			}
-			if len(queue.Buffer) == 0 {
-				time.Sleep(10 * time.Millisecond)
-			}
+			<-queue.flushCommand
+		}
+	}()
+}
+
+func (queue *BufferedQueue) startPacemaker() {
+	go func() {
+		for {
+			queue.flushCommand <- true
+			time.Sleep(10 * time.Millisecond)
 		}
 	}()
 }
