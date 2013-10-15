@@ -70,10 +70,12 @@ func (queue *BufferedQueue) startWritingBufferToRedis() {
 			if len(queue.Buffer) == cap(queue.Buffer) || time.Now().Unix() >= queue.nextWrite {
 				size := len(queue.Buffer)
 				queue.redisClient.Pipelined(func(c *redis.PipelineClient) {
+					a := []string{}
 					for i := 0; i < size; i++ {
 						p := <-queue.Buffer
-						c.LPush(queue.inputName(), p.getString())
+						a = append(a, p.getString())
 					}
+					c.LPush(queue.inputName(), a...)
 					c.IncrBy(queue.inputCounterName(), int64(size))
 				})
 				for i := 0; i < len(queue.flushStatus); i++ {
@@ -90,10 +92,18 @@ func (queue *BufferedQueue) startWritingBufferToRedis() {
 }
 
 func (queue *BufferedQueue) startHeartbeat() {
+	firstWrite := make(chan bool, 1)
 	go func() {
+		firstRun := true
 		for {
 			queue.redisClient.SetEx(queue.heartbeatName(), 1, "ping")
+			if firstRun {
+				firstWrite <- true
+				firstRun = false
+			}
 			time.Sleep(500 * time.Millisecond)
 		}
 	}()
+	<-firstWrite
+	return
 }
