@@ -70,10 +70,12 @@ func (queue *BufferedQueue) startWritingBufferToRedis() {
 			if len(queue.Buffer) == cap(queue.Buffer) || time.Now().Unix() >= queue.nextWrite {
 				size := len(queue.Buffer)
 				queue.redisClient.Pipelined(func(c *redis.PipelineClient) {
+					a := []string{}
 					for i := 0; i < size; i++ {
 						p := <-queue.Buffer
-						c.LPush(queue.inputName(), p.getString())
+						a = append(a, p.getString())
 					}
+					c.LPush(queue.inputName(), a...)
 					c.IncrBy(queue.inputCounterName(), int64(size))
 				})
 				for i := 0; i < len(queue.flushStatus); i++ {

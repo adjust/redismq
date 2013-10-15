@@ -9,7 +9,7 @@ import (
 
 func main() {
 	runtime.GOMAXPROCS(5)
-	server := redismq.NewServer("localhost:6379", "", 9, "9999", over)
+	server := redismq.NewServer("localhost:6379", "", 9, "9999")
 	server.Start()
 	go write("example")
 	go write("example")

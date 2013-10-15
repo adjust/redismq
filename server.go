@@ -29,6 +29,7 @@ func (server *Server) setUpRoutes() {
 // Start enables the Server to listen on his port
 func (server *Server) Start() {
 	go func() {
+		server.observer.Start()
 		server.setUpRoutes()
 		log.Printf("STARTING REDISMQ SERVER ON PORT %s", server.port)
 		err := http.ListenAndServe(":"+server.port, nil)
