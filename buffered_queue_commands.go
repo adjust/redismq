@@ -37,6 +37,7 @@ func (self *BufferedQueue) startWritingBufferToRedis() {
 				}
 				self.nextWrite = time.Now().Unix() + 1
 			}
+			time.Sleep(10 * time.Millisecond)
 		}
 	}()
 }
