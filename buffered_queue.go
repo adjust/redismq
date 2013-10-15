@@ -92,10 +92,18 @@ func (queue *BufferedQueue) startWritingBufferToRedis() {
 }
 
 func (queue *BufferedQueue) startHeartbeat() {
+	firstWrite := make(chan bool, 1)
 	go func() {
+		firstRun := true
 		for {
 			queue.redisClient.SetEx(queue.heartbeatName(), 1, "ping")
+			if firstRun {
+				firstWrite <- true
+				firstRun = false
+			}
 			time.Sleep(500 * time.Millisecond)
 		}
 	}()
+	<-firstWrite
+	return
 }
