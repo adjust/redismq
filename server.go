@@ -1,32 +1,54 @@
 package redismq
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 )
 
+// Server is the web server API for monitoring via JSON
 type Server struct {
 	port     string
-	Overseer *Overseer
+	observer *observer
 }
 
-func NewServer(port string, overseer *Overseer) *Server {
+// NewServer returns a Server that can be started with Start()
+func NewServer(redisURL, redisPassword string, redisDb int64, port string) *Server {
+	observer := newObserver(redisURL, redisPassword, redisDb)
 	s := &Server{
 		port:     port,
-		Overseer: overseer,
+		observer: observer,
 	}
 	return s
 }
 
-func (self *Server) SetUpRoutes() {
-	http.Handle("/stats", NewStatisticsHandler(self.Overseer))
+func (server *Server) setUpRoutes() {
+	http.Handle("/stats", newStatisticsHandler(server.observer))
 }
 
-func (self *Server) Start() {
-	self.SetUpRoutes()
-	log.Printf("STARTING REDISMQ SERVER ON PORT %s", self.port)
-	err := http.ListenAndServe(":"+self.port, nil)
-	if err != nil {
-		log.Fatalf("REDISMQ SERVER SHUTTING DOWN [%s]\n\n", err.Error())
+// Start enables the Server to listen on his port
+func (server *Server) Start() {
+	go func() {
+		server.setUpRoutes()
+		log.Printf("STARTING REDISMQ SERVER ON PORT %s", server.port)
+		err := http.ListenAndServe(":"+server.port, nil)
+		if err != nil {
+			log.Fatalf("REDISMQ SERVER SHUTTING DOWN [%s]\n\n", err.Error())
+		}
+	}()
+}
+
+type statisticsHandler struct {
+	*observer
+}
+
+func newStatisticsHandler(observer *observer) *statisticsHandler {
+	handler := &statisticsHandler{
+		observer: observer,
 	}
+	return handler
+}
+
+func (handler *statisticsHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	fmt.Fprintln(writer, handler.observer.OutputToString())
 }

@@ -96,6 +96,7 @@ The usage is as easy as it gets:
 	...
 	bufferSize := 100
 	testQueue := redismq.NewBufferedQueue("localhost:6379", "", 9, "clicks", bufferSize)
+	testQueue.Start()
 	...
 }
 ```
@@ -161,8 +162,6 @@ To push the message into the `Failed Queue` of this consumer simply set the `req
 }
 ```
 As you can see there is also a command to get messages from the `Failed Queue`.
-
-This should cover the basic use cases, if you want to know more just study the `*_commands.go`.
 
 ## How fast is it
 
