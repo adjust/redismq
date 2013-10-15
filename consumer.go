@@ -126,12 +126,20 @@ func (consumer *Consumer) failPackage(p *Package) error {
 }
 
 func (consumer *Consumer) startHeartbeat() {
+	firstWrite := make(chan bool, 1)
 	go func() {
+		firstRun := true
 		for {
 			consumer.Queue.redisClient.SetEx(consumer.heartbeatName(), 1, "ping")
+			if firstRun {
+				firstWrite <- true
+				firstRun = false
+			}
 			time.Sleep(500 * time.Millisecond)
 		}
 	}()
+	<-firstWrite
+	return
 }
 
 func (consumer *Consumer) parseRedisAnswer(answer *redis.StringReq) (*Package, error) {
