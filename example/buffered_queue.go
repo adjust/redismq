@@ -10,10 +10,10 @@ import (
 // This example demonstrates maximum performance
 func main() {
 	runtime.GOMAXPROCS(5)
-	over := redismq.NewOverseer("localhost:6379", "", 9)
-	server := redismq.NewServer("9999", over)
-	go server.Start()
-	testQueue, err := redismq.NewBufferedQueue("localhost:6379", "", 9, "example", 100)
+	server := redismq.NewServer("localhost:6379", "", 9, "9999", over)
+	server.Start()
+	testQueue := redismq.NewBufferedQueue("localhost:6379", "", 9, "example", 100)
+	err := testQueue.Start()
 	if err != nil {
 		panic(err)
 	}

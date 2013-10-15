@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// Package provides headers and handling functions around payloads
 type Package struct {
 	Payload    string
 	CreatedAt  time.Time
@@ -18,7 +19,7 @@ type Package struct {
 	//wellle suggested error headers for failed packages
 }
 
-func UnmarshalPackage(input string, queue *Queue, consumer *Consumer) (*Package, error) {
+func unmarshalPackage(input string, queue *Queue, consumer *Consumer) (*Package, error) {
 	p := &Package{Queue: queue, Consumer: consumer, Acked: false}
 	err := json.Unmarshal([]byte(input), p)
 	if err != nil {
@@ -27,44 +28,44 @@ func UnmarshalPackage(input string, queue *Queue, consumer *Consumer) (*Package,
 	return p, nil
 }
 
-func (self *Package) GetString() string {
-	//Switch encoding from JSON to GOB to see delta perf.
-	json, err := json.Marshal(self)
+func (pack *Package) getString() string {
+	json, err := json.Marshal(pack)
 	if err != nil {
-		log.Printf(" Queue failed to marshal content %s [%s]", self, err.Error())
-		//TODO build sensible error handling
+		log.Printf(" Queue failed to marshal content %s [%s]", pack, err.Error())
+		// TODO build sensible error handling
 		return ""
 	}
 	return string(json)
 }
 
-func (self *Package) Index() int {
-	if self.Collection == nil {
+func (pack *Package) index() int {
+	if pack.Collection == nil {
 		return 0
 	}
 	var i int
-	for i = range *self.Collection {
-		if (*self.Collection)[i] == self {
+	for i = range *pack.Collection {
+		if (*pack.Collection)[i] == pack {
 			break
 		}
 	}
 	return i
 }
 
-//TODO write in lua
-func (self *Package) MultiAck() (err error) {
-	if self.Collection == nil {
+// MultiAck removes all packaes from the fetched array up to and including this package
+func (pack *Package) MultiAck() (err error) {
+	if pack.Collection == nil {
 		return fmt.Errorf("cannot MultiAck single package")
 	}
-	for i := 0; i <= self.Index(); i++ {
+	// TODO write in lua
+	for i := 0; i <= pack.index(); i++ {
 		var p *Package
-		p = (*self.Collection)[i]
-		//if the package has already been acked just skip
+		p = (*pack.Collection)[i]
+		// if the package has already been acked just skip
 		if p.Acked == true {
 			continue
 		}
 
-		err = self.Consumer.AckPackage(p)
+		err = pack.Consumer.ackPackage(p)
 		if err != nil {
 			break
 		}
@@ -73,23 +74,25 @@ func (self *Package) MultiAck() (err error) {
 	return
 }
 
-func (self *Package) Ack() error {
-	if self.Collection != nil {
+// Ack removes the packages from the queue
+func (pack *Package) Ack() error {
+	if pack.Collection != nil {
 		return fmt.Errorf("cannot Ack package in multi package answer")
 	}
-	err := self.Consumer.AckPackage(self)
+	err := pack.Consumer.ackPackage(pack)
 	return err
 }
 
-func (self *Package) Reject(requeue bool) error {
-	if self.Collection != nil && (*self.Collection)[self.Index()-1].Acked == false {
+// Reject either requeues a package (with requeue=true) back to input or moves it to failed
+func (pack *Package) Reject(requeue bool) error {
+	if pack.Collection != nil && (*pack.Collection)[pack.index()-1].Acked == false {
 		return fmt.Errorf("cannot reject package while unacked package before it")
 	}
 
 	if !requeue {
-		err := self.Consumer.FailPackage(self)
+		err := pack.Consumer.failPackage(pack)
 		return err
 	}
-	err := self.Consumer.RequeuePackage(self)
+	err := pack.Consumer.requeuePackage(pack)
 	return err
 }
