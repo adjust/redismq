@@ -101,6 +101,14 @@ func (consumer *Consumer) ResetWorking() error {
 	return answer.Err()
 }
 
+// RequeueWorking requeues all packages from working to input
+func (consumer *Consumer) RequeueWorking() {
+	for consumer.HasUnacked() {
+		p := consumer.GetUnacked()
+		p.Reject(true)
+	}
+}
+
 func (consumer *Consumer) ackPackage(p *Package) error {
 	_, err := consumer.Queue.redisClient.Pipelined(func(c *redis.PipelineClient) {
 		c.RPop(consumer.WorkingName())
