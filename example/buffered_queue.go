@@ -12,7 +12,7 @@ func main() {
 	runtime.GOMAXPROCS(5)
 	server := redismq.NewServer("localhost:6379", "", 9, "9999")
 	server.Start()
-	testQueue := redismq.NewBufferedQueue("localhost:6379", "", 9, "example", 100)
+	testQueue := redismq.CreateBufferedQueue("localhost:6379", "", 9, "example", 100)
 	err := testQueue.Start()
 	if err != nil {
 		panic(err)
