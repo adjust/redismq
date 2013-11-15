@@ -168,6 +168,25 @@ func (suite *TestSuite) TestRequeueFailed(c *C) {
 	c.Check(suite.queue.GetInputLength(), Equals, int64(100))
 }
 
+// should requeue working
+func (suite *TestSuite) TestRequeueWorking(c *C) {
+	c.Check(suite.queue.Put("testpayload"), Equals, nil)
+
+	_, err := suite.consumer.Get()
+	c.Assert(err, Equals, nil)
+	// assume that consumer crashed and receives err on get
+
+	_, err = suite.consumer.Get()
+	c.Assert(err, Not(Equals), nil)
+
+	p, err := suite.consumer.GetUnacked()
+	c.Assert(err, Equals, nil)
+	c.Check(p.Reject(true), Equals, nil)
+
+	c.Check(suite.consumer.GetUnackedLength(), Equals, int64(0))
+	c.Check(suite.queue.GetInputLength(), Equals, int64(1))
+}
+
 // should get failed
 func (suite *TestSuite) TestGetFailed(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
