@@ -62,7 +62,10 @@ func (observer *observer) GetAllQueues() (queues []*Queue) {
 		return
 	}
 	for _, name := range answer.Val() {
-		queues = append(queues, NewQueue(observer.RedisURL, observer.RedisPassword, observer.RedisDb, name))
+		q, err := SelectQueue(observer.RedisURL, observer.RedisPassword, observer.RedisDb, name)
+		if err == nil {
+			queues = append(queues, q)
+		}
 	}
 	return
 }

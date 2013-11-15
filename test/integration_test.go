@@ -22,25 +22,33 @@ type TestSuite struct {
 var (
 	redisURL      = "localhost:6379"
 	redisPassword = ""
-	redisDb       = int64(9)
+	redisDB       = int64(9)
 	_             = Suite(&TestSuite{})
 )
 
 func (suite *TestSuite) SetUpSuite(c *C) {
 	runtime.GOMAXPROCS(8)
 	rand.Seed(time.Now().UTC().UnixNano())
-	suite.redisClient = redis.NewTCPClient(redisURL, redisPassword, redisDb)
+	suite.redisClient = redis.NewTCPClient(redisURL, redisPassword, redisDB)
 }
 
 func (suite *TestSuite) SetUpTest(c *C) {
 	suite.redisClient.FlushDb()
-	suite.queue = redismq.NewQueue(redisURL, redisPassword, redisDb, "teststuff")
+	suite.queue = redismq.CreateQueue(redisURL, redisPassword, redisDB, "teststuff")
 	suite.consumer, _ = suite.queue.AddConsumer("testconsumer")
 }
 
 // should not allow a second consumer with the same name
 func (suite *TestSuite) TestUniqueConsumer(c *C) {
 	_, err := suite.queue.AddConsumer("testconsumer")
+	c.Check(err, Not(Equals), nil)
+}
+
+// should not select a non existing queue
+func (suite *TestSuite) TestSelectQueue(c *C) {
+	_, err := redismq.SelectQueue(redisURL, redisPassword, redisDB, "i_dont_exists")
+	c.Check(err, Not(Equals), nil)
+	_, err = redismq.SelectBufferedQueue(redisURL, redisPassword, redisDB, "me_neither", 200)
 	c.Check(err, Not(Equals), nil)
 }
 
@@ -228,7 +236,7 @@ func (suite *TestSuite) TestGetFailed(c *C) {
 
 // should handle multiple queues
 func (suite *TestSuite) TestSecondQueue(c *C) {
-	secondQueue := redismq.NewQueue(redisURL, redisPassword, redisDb, "teststuff2")
+	secondQueue := redismq.CreateQueue(redisURL, redisPassword, redisDB, "teststuff2")
 	secondConsumer, err := secondQueue.AddConsumer("testconsumer")
 	c.Assert(err, Equals, nil)
 
@@ -343,18 +351,18 @@ func (suite *TestSuite) TestMultiGetNoWait(c *C) {
 
 // should not allow two buffered queues with the same name
 func (suite *TestSuite) TestUniqueBufferedQueue(c *C) {
-	q := redismq.NewBufferedQueue(redisURL, redisPassword, redisDb, "buffered_test1", 100)
+	q := redismq.CreateBufferedQueue(redisURL, redisPassword, redisDB, "buffered_test1", 100)
 	err := q.Start()
 	c.Check(err, Equals, nil)
 
-	q2 := redismq.NewBufferedQueue(redisURL, redisPassword, redisDb, "buffered_test1", 100)
+	q2 := redismq.CreateBufferedQueue(redisURL, redisPassword, redisDB, "buffered_test1", 100)
 	err = q2.Start()
 	c.Check(err.Error(), Equals, "buffered queue with this name is already started")
 }
 
 // should be able to put and get from buffered queue
 func (suite *TestSuite) TestBufferedQueue(c *C) {
-	q := redismq.NewBufferedQueue(redisURL, redisPassword, redisDb, "buffered_test2", 100)
+	q := redismq.CreateBufferedQueue(redisURL, redisPassword, redisDB, "buffered_test2", 100)
 	err := q.Start()
 	c.Assert(err, Equals, nil)
 
@@ -377,7 +385,7 @@ func (suite *TestSuite) TestBufferedQueue(c *C) {
 
 // should not wait longer than 1 second to read from buffered queue
 func (suite *TestSuite) TestBufferedQueueNoWait(c *C) {
-	q := redismq.NewBufferedQueue(redisURL, redisPassword, redisDb, "buffered_test3", 100)
+	q := redismq.CreateBufferedQueue(redisURL, redisPassword, redisDB, "buffered_test3", 100)
 	err := q.Start()
 	c.Assert(err, Equals, nil)
 
@@ -396,7 +404,7 @@ func (suite *TestSuite) TestBufferedQueueNoWait(c *C) {
 
 // should flush buffered queue upon call
 func (suite *TestSuite) TestBufferedFlush(c *C) {
-	q := redismq.NewBufferedQueue(redisURL, redisPassword, redisDb, "buffered_test4", 1000)
+	q := redismq.CreateBufferedQueue(redisURL, redisPassword, redisDB, "buffered_test4", 1000)
 	err := q.Start()
 	c.Assert(err, Equals, nil)
 	time.Sleep(100 * time.Millisecond)

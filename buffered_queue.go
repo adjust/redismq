@@ -18,10 +18,11 @@ type BufferedQueue struct {
 	flushCommand chan bool
 }
 
-// NewBufferedQueue returns BufferedQueue.
+// CreateBufferedQueue returns BufferedQueue.
 // To start writing the buffer to redis use Start().
 // Optimal BufferSize seems to be around 200.
-func NewBufferedQueue(redisURL, redisPassword string, redisDB int64, name string, bufferSize int) (q *BufferedQueue) {
+// Works like SelectBufferedQueue for existing queues
+func CreateBufferedQueue(redisURL, redisPassword string, redisDB int64, name string, bufferSize int) (q *BufferedQueue) {
 	q = &BufferedQueue{
 		Queue:        &Queue{Name: name},
 		BufferSize:   bufferSize,
@@ -31,6 +32,17 @@ func NewBufferedQueue(redisURL, redisPassword string, redisDB int64, name string
 	}
 	q.redisClient = redis.NewTCPClient(redisURL, redisPassword, redisDB)
 	return q
+}
+
+// SelectBufferedQueue returns a BufferedQueue if a queue with the name exists
+func SelectBufferedQueue(redisURL, redisPassword string, redisDB int64, name string, bufferSize int) (queue *BufferedQueue, err error) {
+	redisClient := redis.NewTCPClient(redisURL, redisPassword, redisDB)
+	answer := redisClient.SIsMember(masterQueueKey(), name)
+	if answer.Val() {
+		queue = CreateBufferedQueue(redisURL, redisPassword, redisDB, name, bufferSize)
+		return queue, nil
+	}
+	return nil, fmt.Errorf("queue with this name doesn't exist")
 }
 
 func (queue *BufferedQueue) heartbeatName() string {
