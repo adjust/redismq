@@ -102,11 +102,15 @@ func (consumer *Consumer) ResetWorking() error {
 }
 
 // RequeueWorking requeues all packages from working to input
-func (consumer *Consumer) RequeueWorking() {
+func (consumer *Consumer) RequeueWorking() error {
 	for consumer.HasUnacked() {
-		p := consumer.GetUnacked()
+		p, err := consumer.GetUnacked()
+		if err != nil {
+			return err
+		}
 		p.Reject(true)
 	}
+	return nil
 }
 
 func (consumer *Consumer) ackPackage(p *Package) error {
