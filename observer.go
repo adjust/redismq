@@ -2,11 +2,15 @@ package redismq
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/adeven/redis"
 	"log"
+	"strconv"
 	"time"
 )
 
+// this is a very simple implementation of a statistics observer
+// far more complex things can be implemented with the way stats are written
 type observer struct {
 	redisClient   *redis.Client `json:"-"`
 	RedisURL      string        `json:"-"`
@@ -21,15 +25,13 @@ type queueStat struct {
 	AckRate       int64
 	FailRate      int64
 	InputSize     int64
-	UnAckSize     int64
 	FailSize      int64
 	consumerStats map[string]*consumerStat
 }
 
 type consumerStat struct {
-	WorkRate  int64
-	AckRate   int64
-	UnAckSize int64
+	WorkRate int64
+	AckRate  int64
 }
 
 func newObserver(redisURL, redisPassword string, redisDb int64) *observer {
@@ -43,71 +45,74 @@ func newObserver(redisURL, redisPassword string, redisDb int64) *observer {
 	return q
 }
 
-func (observer *observer) Start() {
-	go func() {
-		for {
-			for _, queue := range observer.GetAllQueues() {
-				if observer.Stats[queue.Name] == nil {
-					observer.WatchQueue(queue)
-				}
-			}
-			time.Sleep(2 * time.Second)
-		}
-	}()
+func (observer *observer) getAllQueues() (queues []string, err error) {
+	answer := observer.redisClient.SMembers(masterQueueKey())
+	return answer.Val(), answer.Err()
 }
 
-func (observer *observer) GetAllQueues() (queues []*Queue) {
-	answer := observer.redisClient.SMembers(masterQueueKey())
-	if answer.Err() != nil {
+func (observer *observer) getConsumers(queue string) (consumers []string, err error) {
+	answer := observer.redisClient.SMembers(queueWorkersKey(queue))
+	return answer.Val(), answer.Err()
+}
+
+func (observer *observer) update() {
+	queues, err := observer.getAllQueues()
+	if err != nil {
+		log.Fatalf("ERROR FETCHING QUEUES %s", err.Error())
+	}
+
+	for _, queue := range queues {
+		observer.poll(queue)
+	}
+}
+
+func (observer *observer) poll(queue string) {
+	if observer.Stats[queue] == nil {
+		observer.Stats[queue] = &queueStat{consumerStats: make(map[string]*consumerStat)}
+	}
+	observer.Stats[queue].InputRate = observer.fetchStat(queueInputRateKey(queue))
+	observer.Stats[queue].FailRate = observer.fetchStat(queueFailedRateKey(queue))
+	observer.Stats[queue].InputSize = observer.fetchStat(queueInputSizeKey(queue))
+	observer.Stats[queue].FailSize = observer.fetchStat(queueFailedSizeKey(queue))
+
+	observer.Stats[queue].WorkRate = 0
+	observer.Stats[queue].AckRate = 0
+
+	consumers, err := observer.getConsumers(queue)
+	if err != nil {
+		log.Fatalf("ERROR FETCHING CONSUMERS for %s %s", queue, err.Error())
 		return
 	}
-	for _, name := range answer.Val() {
-		q, err := SelectQueue(observer.RedisURL, observer.RedisPassword, observer.RedisDb, name)
-		if err == nil {
-			queues = append(queues, q)
+
+	for _, consumer := range consumers {
+		if observer.Stats[queue].consumerStats[consumer] == nil {
+			observer.Stats[queue].consumerStats[consumer] = &consumerStat{}
 		}
+		observer.Stats[queue].consumerStats[consumer] = &consumerStat{}
+		observer.Stats[queue].consumerStats[consumer].AckRate = observer.fetchStat(consumerAckRateKey(queue, consumer))
+		observer.Stats[queue].consumerStats[consumer].WorkRate = observer.fetchStat(consumerWorkingRateKey(queue, consumer))
+
+		observer.Stats[queue].AckRate += observer.Stats[queue].consumerStats[consumer].AckRate
+		observer.Stats[queue].WorkRate += observer.Stats[queue].consumerStats[consumer].WorkRate
 	}
-	return
 }
 
-func (observer *observer) WatchQueue(queue *Queue) {
-	observer.Stats[queue.Name] = &queueStat{consumerStats: make(map[string]*consumerStat)}
-	go observer.Poll(queue)
-}
-
-func (observer *observer) Poll(queue *Queue) {
-	for {
-		observer.Stats[queue.Name].InputRate = queue.getInputRate()
-		observer.Stats[queue.Name].FailRate = queue.getFailedRate()
-		observer.Stats[queue.Name].InputSize = queue.GetInputLength()
-		observer.Stats[queue.Name].FailSize = queue.GetFailedLength()
-
-		observer.Stats[queue.Name].WorkRate = 0
-		observer.Stats[queue.Name].AckRate = 0
-		observer.Stats[queue.Name].UnAckSize = 0
-
-		brokers, err := queue.getBrokers()
-		if err != nil {
-			continue //TODO handle this
-		}
-
-		for _, broker := range brokers {
-			observer.Stats[queue.Name].consumerStats[broker.Name] = &consumerStat{}
-			observer.Stats[queue.Name].consumerStats[broker.Name].AckRate = broker.GetAckRate()
-			observer.Stats[queue.Name].consumerStats[broker.Name].WorkRate = broker.GetWorkRate()
-			observer.Stats[queue.Name].consumerStats[broker.Name].UnAckSize = broker.GetUnackedLength()
-
-			observer.Stats[queue.Name].AckRate += observer.Stats[queue.Name].consumerStats[broker.Name].AckRate
-			observer.Stats[queue.Name].WorkRate += observer.Stats[queue.Name].consumerStats[broker.Name].WorkRate
-			observer.Stats[queue.Name].UnAckSize += observer.Stats[queue.Name].consumerStats[broker.Name].UnAckSize
-		}
-
-		time.Sleep(1 * time.Second)
+func (observer *observer) fetchStat(keyName string) int64 {
+	now := time.Now().UTC().Unix() - 2 // we can only look for already written stats
+	key := fmt.Sprintf("%s::%d", keyName, now)
+	answer := observer.redisClient.Get(key)
+	if answer.Err() != nil {
+		return 0
 	}
-
+	i, err := strconv.ParseInt(answer.Val(), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return i
 }
 
 func (observer *observer) OutputToString() string {
+	observer.update()
 	json, err := json.Marshal(observer)
 	if err != nil {
 		log.Fatalf("ERROR MARSHALLING OVERSEER %s", err.Error())

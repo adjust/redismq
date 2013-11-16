@@ -8,16 +8,17 @@ import (
 
 // Consumer are used for reading from queues
 type Consumer struct {
-	*broker
+	Name  string
+	Queue *Queue
 }
 
 // AddConsumer returns a conumser that can write from the queue
 func (queue *Queue) AddConsumer(name string) (c *Consumer, err error) {
-	c = &Consumer{&broker{Name: name, Queue: queue}}
+	c = &Consumer{Name: name, Queue: queue}
 	//check uniqueness and start heartbeat
-	added := queue.redisClient.SAdd(queue.workerKey(), name).Val()
+	added := queue.redisClient.SAdd(queueWorkersKey(queue.Name), name).Val()
 	if added == 0 {
-		val := queue.redisClient.Get(c.heartbeatName()).Val()
+		val := queue.redisClient.Get(consumerHeartbeatKey(queue.Name, name)).Val()
 		if val == "ping" {
 			return nil, fmt.Errorf("consumer with this name is already active")
 		}
@@ -43,9 +44,16 @@ func (consumer *Consumer) MultiGet(length int) ([]*Package, error) {
 
 	// TODO maybe use transactions for rollback in case of errors?
 	reqs, err := consumer.Queue.redisClient.Pipelined(func(c *redis.PipelineClient) {
-		c.BRPopLPush(consumer.Queue.inputName(), consumer.WorkingName(), 0)
+		c.BRPopLPush(
+			queueInputKey(consumer.Queue.Name),
+			consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
+			0,
+		)
 		for i := 1; i < length; i++ {
-			c.RPopLPush(consumer.Queue.inputName(), consumer.WorkingName())
+			c.RPopLPush(
+				queueInputKey(consumer.Queue.Name),
+				consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
+			)
 		}
 
 	})
@@ -69,7 +77,11 @@ func (consumer *Consumer) MultiGet(length int) ([]*Package, error) {
 			collection = append(collection, p)
 		}
 	}
-	consumer.Queue.redisClient.IncrBy(consumer.WorkingCounterName(), int64(length))
+	consumer.Queue.trackStats(
+		consumerWorkingRateKey(consumer.Queue.Name, consumer.Name),
+		int64(length),
+		true,
+	)
 
 	return collection, nil
 }
@@ -79,25 +91,43 @@ func (consumer *Consumer) GetUnacked() (*Package, error) {
 	if !consumer.HasUnacked() {
 		return nil, fmt.Errorf("no unacked Packages found")
 	}
-	answer := consumer.Queue.redisClient.LIndex(consumer.WorkingName(), -1)
+	answer := consumer.Queue.redisClient.LIndex(
+		consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
+		-1,
+	)
 	return consumer.parseRedisAnswer(answer)
+}
+
+// HasUnacked returns true if the consumers has unacked packages
+func (consumer *Consumer) HasUnacked() bool {
+	if consumer.GetUnackedLength() != 0 {
+		return true
+	}
+	return false
+}
+
+// GetUnackedLength returns the number of packages in the unacked queue
+func (consumer *Consumer) GetUnackedLength() int64 {
+	l := consumer.Queue.redisClient.LLen(consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name))
+	return l.Val()
 }
 
 // GetFailed returns a single packages from the failed queue of this consumer
 func (consumer *Consumer) GetFailed() (*Package, error) {
-	var answer *redis.StringReq
-
-	consumer.Queue.redisClient.Pipelined(func(c *redis.PipelineClient) {
-		answer = c.RPopLPush(consumer.Queue.failedName(), consumer.WorkingName())
-		c.Incr(consumer.WorkingCounterName())
-	})
-
+	answer := consumer.Queue.redisClient.RPopLPush(
+		queueFailedKey(consumer.Queue.Name),
+		consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
+	)
+	consumer.Queue.trackStats(
+		consumerWorkingRateKey(consumer.Queue.Name, consumer.Name),
+		1, true,
+	)
 	return consumer.parseRedisAnswer(answer)
 }
 
 // ResetWorking deletes! all messages in the working queue of this consumer
 func (consumer *Consumer) ResetWorking() error {
-	answer := consumer.Queue.redisClient.Del(consumer.WorkingName())
+	answer := consumer.Queue.redisClient.Del(consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name))
 	return answer.Err()
 }
 
@@ -114,27 +144,31 @@ func (consumer *Consumer) RequeueWorking() error {
 }
 
 func (consumer *Consumer) ackPackage(p *Package) error {
-	_, err := consumer.Queue.redisClient.Pipelined(func(c *redis.PipelineClient) {
-		c.RPop(consumer.WorkingName())
-		c.Incr(consumer.AckCounterName())
-	})
-	return err
+	answer := consumer.Queue.redisClient.RPop(consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name))
+	consumer.Queue.trackStats(
+		consumerAckRateKey(consumer.Queue.Name, consumer.Name),
+		1,
+		true,
+	)
+	return answer.Err()
 }
 
 func (consumer *Consumer) requeuePackage(p *Package) error {
-	_, err := consumer.Queue.redisClient.Pipelined(func(c *redis.PipelineClient) {
-		c.RPopLPush(consumer.WorkingName(), consumer.Queue.inputName())
-		c.Incr(consumer.Queue.inputCounterName())
-	})
-	return err
+	answer := consumer.Queue.redisClient.RPopLPush(
+		consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
+		queueInputKey(consumer.Queue.Name),
+	)
+	consumer.Queue.trackStats(queueInputRateKey(consumer.Queue.Name), 1, true)
+	return answer.Err()
 }
 
 func (consumer *Consumer) failPackage(p *Package) error {
-	_, err := consumer.Queue.redisClient.Pipelined(func(c *redis.PipelineClient) {
-		c.RPopLPush(consumer.WorkingName(), consumer.Queue.failedName())
-		c.Incr(consumer.Queue.failedCounterName())
-	})
-	return err
+	answer := consumer.Queue.redisClient.RPopLPush(
+		consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
+		queueFailedKey(consumer.Queue.Name),
+	)
+	consumer.Queue.trackStats(queueFailedRateKey(consumer.Queue.Name), 1, true)
+	return answer.Err()
 }
 
 func (consumer *Consumer) startHeartbeat() {
@@ -142,7 +176,11 @@ func (consumer *Consumer) startHeartbeat() {
 	go func() {
 		firstRun := true
 		for {
-			consumer.Queue.redisClient.SetEx(consumer.heartbeatName(), 1, "ping")
+			consumer.Queue.redisClient.SetEx(
+				consumerHeartbeatKey(consumer.Queue.Name, consumer.Name),
+				1,
+				"ping",
+			)
 			if firstRun {
 				firstWrite <- true
 				firstRun = false
@@ -165,17 +203,16 @@ func (consumer *Consumer) parseRedisAnswer(answer *redis.StringReq) (*Package, e
 	return p, nil
 }
 
-func (consumer *Consumer) heartbeatName() string {
-	return consumer.WorkingName() + "::heartbeat"
-}
-
 func (consumer *Consumer) unsafeGet() (*Package, error) {
-	var answer *redis.StringReq
-
-	consumer.Queue.redisClient.Pipelined(func(c *redis.PipelineClient) {
-		answer = c.BRPopLPush(consumer.Queue.inputName(), consumer.WorkingName(), 0)
-		c.Incr(consumer.WorkingCounterName())
-	})
-
+	answer := consumer.Queue.redisClient.BRPopLPush(
+		queueInputKey(consumer.Queue.Name),
+		consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
+		0,
+	)
+	consumer.Queue.trackStats(
+		consumerWorkingRateKey(consumer.Queue.Name, consumer.Name),
+		1,
+		true,
+	)
 	return consumer.parseRedisAnswer(answer)
 }

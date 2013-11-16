@@ -2,7 +2,6 @@ package redismq
 
 import (
 	"fmt"
-	"github.com/adeven/redis"
 	"time"
 )
 
@@ -22,38 +21,38 @@ type BufferedQueue struct {
 // To start writing the buffer to redis use Start().
 // Optimal BufferSize seems to be around 200.
 // Works like SelectBufferedQueue for existing queues
-func CreateBufferedQueue(redisURL, redisPassword string, redisDB int64, name string, bufferSize int) (q *BufferedQueue) {
-	q = &BufferedQueue{
-		Queue:        &Queue{Name: name},
+func CreateBufferedQueue(redisURL, redisPassword string, redisDB int64, name string, bufferSize int) *BufferedQueue {
+	q := CreateQueue(redisURL, redisPassword, redisDB, name)
+	return &BufferedQueue{
+		Queue:        q,
 		BufferSize:   bufferSize,
 		Buffer:       make(chan *Package, bufferSize*2),
 		flushStatus:  make(chan chan bool, 1),
 		flushCommand: make(chan bool, bufferSize*2),
 	}
-	q.redisClient = redis.NewTCPClient(redisURL, redisPassword, redisDB)
-	return q
 }
 
 // SelectBufferedQueue returns a BufferedQueue if a queue with the name exists
 func SelectBufferedQueue(redisURL, redisPassword string, redisDB int64, name string, bufferSize int) (queue *BufferedQueue, err error) {
-	redisClient := redis.NewTCPClient(redisURL, redisPassword, redisDB)
-	answer := redisClient.SIsMember(masterQueueKey(), name)
-	if answer.Val() {
-		queue = CreateBufferedQueue(redisURL, redisPassword, redisDB, name, bufferSize)
-		return queue, nil
+	q, err := SelectQueue(redisURL, redisPassword, redisDB, name)
+	if err != nil {
+		return nil, err
 	}
-	return nil, fmt.Errorf("queue with this name doesn't exist")
-}
 
-func (queue *BufferedQueue) heartbeatName() string {
-	return queue.inputName() + "::buffered::heartbeat"
+	return &BufferedQueue{
+		Queue:        q,
+		BufferSize:   bufferSize,
+		Buffer:       make(chan *Package, bufferSize*2),
+		flushStatus:  make(chan chan bool, 1),
+		flushCommand: make(chan bool, bufferSize*2),
+	}, nil
 }
 
 // Start dispatches the background writer that flushes the buffer.
 // If there is already a BufferedQueue running it will return an error.
 func (queue *BufferedQueue) Start() error {
 	queue.redisClient.SAdd(masterQueueKey(), queue.Name)
-	val := queue.redisClient.Get(queue.heartbeatName()).Val()
+	val := queue.redisClient.Get(queueHeartbeatKey(queue.Name)).Val()
 	if val == "ping" {
 		return fmt.Errorf("buffered queue with this name is already started")
 	}
@@ -86,15 +85,13 @@ func (queue *BufferedQueue) startWritingBufferToRedis() {
 		for {
 			if len(queue.Buffer) >= queue.BufferSize || time.Now().Unix() >= queue.nextWrite {
 				size := len(queue.Buffer)
-				queue.redisClient.Pipelined(func(c *redis.PipelineClient) {
-					a := []string{}
-					for i := 0; i < size; i++ {
-						p := <-queue.Buffer
-						a = append(a, p.getString())
-					}
-					c.LPush(queue.inputName(), a...)
-					c.IncrBy(queue.inputCounterName(), int64(size))
-				})
+				a := []string{}
+				for i := 0; i < size; i++ {
+					p := <-queue.Buffer
+					a = append(a, p.getString())
+				}
+				queue.redisClient.LPush(queueInputKey(queue.Name), a...)
+				queue.trackStats(queueInputRateKey(queue.Name), int64(size), true)
 				for i := 0; i < len(queue.flushStatus); i++ {
 					c := <-queue.flushStatus
 					c <- true
@@ -120,7 +117,7 @@ func (queue *BufferedQueue) startHeartbeat() {
 	go func() {
 		firstRun := true
 		for {
-			queue.redisClient.SetEx(queue.heartbeatName(), 1, "ping")
+			queue.redisClient.SetEx(queueHeartbeatKey(queue.Name), 1, "ping")
 			if firstRun {
 				firstWrite <- true
 				firstRun = false
