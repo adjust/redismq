@@ -113,7 +113,6 @@ func (queue *Queue) startStatsWriter() {
 			now := time.Now().UTC().Unix()
 			queue.trackStats(queueInputSizeKey(queue.Name), queue.GetInputLength(), false)
 			queue.trackStats(queueFailedSizeKey(queue.Name), queue.GetFailedLength(), false)
-			fmt.Println("checking to write")
 			queue.writeStatsCacheToRedis(now)
 			time.Sleep(1 * time.Second)
 		}
@@ -138,11 +137,8 @@ func (queue *Queue) startStatsCache() {
 }
 
 func (queue *Queue) writeStatsCacheToRedis(now int64) {
-	fmt.Printf("start writing for %s -> %d\n", queue.Name, now)
-
 	for sec := range queue.statsCache {
 		if sec >= now-1 {
-			fmt.Println("skipped now")
 			continue
 		}
 
@@ -154,13 +150,10 @@ func (queue *Queue) writeStatsCacheToRedis(now int64) {
 			} else {
 				queue.redisClient.Set(key, strconv.FormatInt(value, 10))
 			}
-			fmt.Printf("written stats: %s -> %d\n", key, value)
 
 			// save stats to redis with 2h expiration
 			queue.redisClient.Expire(key, 7200)
 		}
 		delete(queue.statsCache, sec)
-		fmt.Printf("second written %d\n", sec)
 	}
-	fmt.Printf("block written for %s\n\n\n", queue.Name)
 }
