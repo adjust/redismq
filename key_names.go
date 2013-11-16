@@ -20,10 +20,6 @@ func queueInputRateKey(queue string) string {
 	return queueInputKey(queue) + "::rate"
 }
 
-func queueFailedRateKey(queue string) string {
-	return queueFailedKey(queue) + "::rate"
-}
-
 func queueInputSizeKey(queue string) string {
 	return queueInputKey(queue) + "::size"
 }
@@ -40,19 +36,11 @@ func queueWorkingPrefix(queue string) string {
 	return "redismq::" + queue + "::working"
 }
 
-func queueAckPrefix(queue string) string {
-	return "redismq::" + queue + "::ack"
-}
-
 func consumerWorkingQueueKey(queue, consumer string) string {
 	return queueWorkingPrefix(queue) + "::" + consumer
 }
 func consumerWorkingRateKey(queue, consumer string) string {
 	return consumerWorkingQueueKey(queue, consumer) + "::rate"
-}
-
-func consumerAckRateKey(queue, consumer string) string {
-	return queueAckPrefix(queue) + "::" + consumer + "::rate"
 }
 
 func consumerHeartbeatKey(queue, consumer string) string {

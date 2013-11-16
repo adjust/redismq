@@ -22,16 +22,13 @@ type observer struct {
 type queueStat struct {
 	InputRate     int64
 	WorkRate      int64
-	AckRate       int64
-	FailRate      int64
 	InputSize     int64
 	FailSize      int64
-	consumerStats map[string]*consumerStat
+	ConsumerStats map[string]*consumerStat
 }
 
 type consumerStat struct {
 	WorkRate int64
-	AckRate  int64
 }
 
 func newObserver(redisURL, redisPassword string, redisDb int64) *observer {
@@ -68,15 +65,13 @@ func (observer *observer) update() {
 
 func (observer *observer) poll(queue string) {
 	if observer.Stats[queue] == nil {
-		observer.Stats[queue] = &queueStat{consumerStats: make(map[string]*consumerStat)}
+		observer.Stats[queue] = &queueStat{ConsumerStats: make(map[string]*consumerStat)}
 	}
 	observer.Stats[queue].InputRate = observer.fetchStat(queueInputRateKey(queue))
-	observer.Stats[queue].FailRate = observer.fetchStat(queueFailedRateKey(queue))
 	observer.Stats[queue].InputSize = observer.fetchStat(queueInputSizeKey(queue))
 	observer.Stats[queue].FailSize = observer.fetchStat(queueFailedSizeKey(queue))
 
 	observer.Stats[queue].WorkRate = 0
-	observer.Stats[queue].AckRate = 0
 
 	consumers, err := observer.getConsumers(queue)
 	if err != nil {
@@ -85,20 +80,16 @@ func (observer *observer) poll(queue string) {
 	}
 
 	for _, consumer := range consumers {
-		if observer.Stats[queue].consumerStats[consumer] == nil {
-			observer.Stats[queue].consumerStats[consumer] = &consumerStat{}
+		if observer.Stats[queue].ConsumerStats[consumer] == nil {
+			observer.Stats[queue].ConsumerStats[consumer] = &consumerStat{}
 		}
-		observer.Stats[queue].consumerStats[consumer] = &consumerStat{}
-		observer.Stats[queue].consumerStats[consumer].AckRate = observer.fetchStat(consumerAckRateKey(queue, consumer))
-		observer.Stats[queue].consumerStats[consumer].WorkRate = observer.fetchStat(consumerWorkingRateKey(queue, consumer))
-
-		observer.Stats[queue].AckRate += observer.Stats[queue].consumerStats[consumer].AckRate
-		observer.Stats[queue].WorkRate += observer.Stats[queue].consumerStats[consumer].WorkRate
+		observer.Stats[queue].ConsumerStats[consumer].WorkRate = observer.fetchStat(consumerWorkingRateKey(queue, consumer))
+		observer.Stats[queue].WorkRate += observer.Stats[queue].ConsumerStats[consumer].WorkRate
 	}
 }
 
 func (observer *observer) fetchStat(keyName string) int64 {
-	now := time.Now().UTC().Unix() - 2 // we can only look for already written stats
+	now := time.Now().UTC().Unix() - 3 // we can only look for already written stats
 	key := fmt.Sprintf("%s::%d", keyName, now)
 	answer := observer.redisClient.Get(key)
 	if answer.Err() != nil {

@@ -145,11 +145,6 @@ func (consumer *Consumer) RequeueWorking() error {
 
 func (consumer *Consumer) ackPackage(p *Package) error {
 	answer := consumer.Queue.redisClient.RPop(consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name))
-	consumer.Queue.trackStats(
-		consumerAckRateKey(consumer.Queue.Name, consumer.Name),
-		1,
-		true,
-	)
 	return answer.Err()
 }
 
@@ -167,7 +162,6 @@ func (consumer *Consumer) failPackage(p *Package) error {
 		consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
 		queueFailedKey(consumer.Queue.Name),
 	)
-	consumer.Queue.trackStats(queueFailedRateKey(consumer.Queue.Name), 1, true)
 	return answer.Err()
 }
 

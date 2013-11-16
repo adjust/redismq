@@ -141,7 +141,7 @@ func (queue *Queue) writeStatsCacheToRedis(now int64) {
 	fmt.Printf("start writing for %s -> %d\n", queue.Name, now)
 
 	for sec := range queue.statsCache {
-		if sec == now {
+		if sec >= now-1 {
 			fmt.Println("skipped now")
 			continue
 		}
