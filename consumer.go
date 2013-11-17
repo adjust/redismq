@@ -77,10 +77,9 @@ func (consumer *Consumer) MultiGet(length int) ([]*Package, error) {
 			collection = append(collection, p)
 		}
 	}
-	consumer.Queue.trackStats(
+	consumer.Queue.incrRate(
 		consumerWorkingRateKey(consumer.Queue.Name, consumer.Name),
 		int64(length),
-		true,
 	)
 
 	return collection, nil
@@ -118,9 +117,9 @@ func (consumer *Consumer) GetFailed() (*Package, error) {
 		queueFailedKey(consumer.Queue.Name),
 		consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
 	)
-	consumer.Queue.trackStats(
+	consumer.Queue.incrRate(
 		consumerWorkingRateKey(consumer.Queue.Name, consumer.Name),
-		1, true,
+		1,
 	)
 	return consumer.parseRedisAnswer(answer)
 }
@@ -153,7 +152,7 @@ func (consumer *Consumer) requeuePackage(p *Package) error {
 		consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
 		queueInputKey(consumer.Queue.Name),
 	)
-	consumer.Queue.trackStats(queueInputRateKey(consumer.Queue.Name), 1, true)
+	consumer.Queue.incrRate(queueInputRateKey(consumer.Queue.Name), 1)
 	return answer.Err()
 }
 
@@ -203,10 +202,9 @@ func (consumer *Consumer) unsafeGet() (*Package, error) {
 		consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
 		0,
 	)
-	consumer.Queue.trackStats(
+	consumer.Queue.incrRate(
 		consumerWorkingRateKey(consumer.Queue.Name, consumer.Name),
 		1,
-		true,
 	)
 	return consumer.parseRedisAnswer(answer)
 }
