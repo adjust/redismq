@@ -1,8 +1,7 @@
-package main
+package redismq
 
 import (
 	//"fmt"
-	"github.com/adeven/redismq"
 	. "github.com/matttproud/gocheck"
 	"math/rand"
 	"runtime"
@@ -12,12 +11,12 @@ import (
 )
 
 type BenchmarkSuite struct {
-	queue1k         *redismq.Queue
-	queue4k         *redismq.Queue
-	consumer1k      *redismq.Consumer
-	consumer4k      *redismq.Consumer
-	mutliConsumer1k []*redismq.Consumer
-	mutliConsumer4k []*redismq.Consumer
+	queue1k         *Queue
+	queue4k         *Queue
+	consumer1k      *Consumer
+	consumer4k      *Consumer
+	mutliConsumer1k []*Consumer
+	mutliConsumer4k []*Consumer
 }
 
 var _ = Suite(&BenchmarkSuite{})
@@ -25,23 +24,23 @@ var _ = Suite(&BenchmarkSuite{})
 func (suite *BenchmarkSuite) SetUpSuite(c *C) {
 	runtime.GOMAXPROCS(8)
 	rand.Seed(time.Now().UTC().UnixNano())
-	suite.queue1k = redismq.CreateQueue(redisURL, redisPassword, redisDB, "teststuff1k")
-	suite.queue4k = redismq.CreateQueue(redisURL, redisPassword, redisDB, "teststuff4k")
+	suite.queue1k = CreateQueue(redisURL, redisPassword, redisDB, "teststuff1k")
+	suite.queue4k = CreateQueue(redisURL, redisPassword, redisDB, "teststuff4k")
 	suite.consumer1k, _ = suite.queue1k.AddConsumer("testconsumer")
 	suite.consumer4k, _ = suite.queue4k.AddConsumer("testconsumer")
 
-	suite.mutliConsumer1k = make([]*redismq.Consumer, 0)
+	suite.mutliConsumer1k = make([]*Consumer, 0)
 	for i := 0; i < 4; i++ {
-		q := redismq.CreateQueue(redisURL, redisPassword, redisDB, "teststuff1k")
+		q := CreateQueue(redisURL, redisPassword, redisDB, "teststuff1k")
 		c, err := q.AddConsumer("c" + strconv.Itoa(i))
 		if err != nil {
 			panic(err)
 		}
 		suite.mutliConsumer1k = append(suite.mutliConsumer1k, c)
 	}
-	suite.mutliConsumer4k = make([]*redismq.Consumer, 0)
+	suite.mutliConsumer4k = make([]*Consumer, 0)
 	for i := 0; i < 4; i++ {
-		q := redismq.CreateQueue(redisURL, redisPassword, redisDB, "teststuff4k")
+		q := CreateQueue(redisURL, redisPassword, redisDB, "teststuff4k")
 		c, err := q.AddConsumer("c" + strconv.Itoa(i))
 		if err != nil {
 			panic(err)
@@ -113,7 +112,7 @@ func (suite *BenchmarkSuite) BenchmarkFourPub1k(c *C) {
 	payload := randomString(1024)
 	for i := 0; i < c.N; i++ {
 		for _, c := range suite.mutliConsumer1k {
-			go func(consumer *redismq.Consumer) {
+			go func(consumer *Consumer) {
 				consumer.Queue.Put(payload)
 				defer wg.Done()
 			}(c)
@@ -128,7 +127,7 @@ func (suite *BenchmarkSuite) BenchmarkFourCon1k(c *C) {
 	var wg sync.WaitGroup
 	for i := 0; i < c.N; i++ {
 		for _, c := range suite.mutliConsumer1k {
-			go func(consumer *redismq.Consumer) {
+			go func(consumer *Consumer) {
 				p, _ := consumer.Get()
 				p.Ack()
 				defer wg.Done()
@@ -145,7 +144,7 @@ func (suite *BenchmarkSuite) BenchmarkFourPub4k(c *C) {
 	payload := randomString(1024)
 	for i := 0; i < c.N; i++ {
 		for _, c := range suite.mutliConsumer4k {
-			go func(consumer *redismq.Consumer) {
+			go func(consumer *Consumer) {
 				consumer.Queue.Put(payload)
 				defer wg.Done()
 			}(c)
@@ -160,7 +159,7 @@ func (suite *BenchmarkSuite) BenchmarkFourCon4k(c *C) {
 	var wg sync.WaitGroup
 	for i := 0; i < c.N; i++ {
 		for _, c := range suite.mutliConsumer4k {
-			go func(consumer *redismq.Consumer) {
+			go func(consumer *Consumer) {
 				p, _ := consumer.Get()
 				p.Ack()
 				defer wg.Done()
@@ -222,14 +221,14 @@ func (suite *BenchmarkSuite) BenchmarkFourPubFourCon1k(c *C) {
 
 	for i := 0; i < c.N; i++ {
 		for _, c := range suite.mutliConsumer1k {
-			go func(consumer *redismq.Consumer) {
+			go func(consumer *Consumer) {
 				consumer.Queue.Put(payload)
 				defer wg.Done()
 			}(c)
 			wg.Add(1)
 		}
 		for _, c := range suite.mutliConsumer1k {
-			go func(consumer *redismq.Consumer) {
+			go func(consumer *Consumer) {
 				p, _ := consumer.Get()
 				p.Ack()
 				defer wg.Done()
@@ -248,14 +247,14 @@ func (suite *BenchmarkSuite) BenchmarkFourPubFourCon4k(c *C) {
 
 	for i := 0; i < c.N; i++ {
 		for _, c := range suite.mutliConsumer4k {
-			go func(consumer *redismq.Consumer) {
+			go func(consumer *Consumer) {
 				consumer.Queue.Put(payload)
 				defer wg.Done()
 			}(c)
 			wg.Add(1)
 		}
 		for _, c := range suite.mutliConsumer4k {
-			go func(consumer *redismq.Consumer) {
+			go func(consumer *Consumer) {
 				p, _ := consumer.Get()
 				p.Ack()
 				defer wg.Done()
