@@ -123,7 +123,7 @@ func (suite *TestSuite) TestRequeue(c *C) {
 
 	p, err := suite.consumer.Get()
 	c.Assert(err, Equals, nil)
-	c.Check(p.Reject(true), Equals, nil)
+	c.Check(p.Requeue(), Equals, nil)
 
 	p2, err2 := suite.consumer.Get()
 	c.Assert(err2, Equals, nil)
@@ -136,7 +136,7 @@ func (suite *TestSuite) TestFailed(c *C) {
 
 	p, err := suite.consumer.Get()
 	c.Assert(err, Equals, nil)
-	c.Check(p.Reject(false), Equals, nil)
+	c.Check(p.Fail(), Equals, nil)
 
 	c.Check(suite.queue.GetFailedLength(), Equals, int64(1))
 }
@@ -168,7 +168,7 @@ func (suite *TestSuite) TestRequeueFailed(c *C) {
 	for i := 0; i < 100; i++ {
 		p, err := suite.consumer.Get()
 		c.Check(err, Equals, nil)
-		c.Check(p.Reject(false), Equals, nil)
+		c.Check(p.Fail(), Equals, nil)
 	}
 	c.Check(suite.queue.GetFailedLength(), Equals, int64(100))
 	c.Check(suite.queue.RequeueFailed(), Equals, nil)
@@ -189,7 +189,7 @@ func (suite *TestSuite) TestRequeueWorkingManual(c *C) {
 
 	p, err := suite.consumer.GetUnacked()
 	c.Assert(err, Equals, nil)
-	c.Check(p.Reject(true), Equals, nil)
+	c.Check(p.Requeue(), Equals, nil)
 
 	c.Check(suite.consumer.GetUnackedLength(), Equals, int64(0))
 	c.Check(suite.queue.GetInputLength(), Equals, int64(1))
@@ -219,7 +219,7 @@ func (suite *TestSuite) TestGetFailed(c *C) {
 
 	p, err := suite.consumer.Get()
 	c.Assert(err, Equals, nil)
-	c.Check(p.Reject(false), Equals, nil)
+	c.Check(p.Fail(), Equals, nil)
 	c.Check(suite.queue.GetFailedLength(), Equals, int64(1))
 
 	p2, err := suite.consumer.GetFailed()
@@ -317,9 +317,9 @@ func (suite *TestSuite) TestMultiGetAndBlockedReject(c *C) {
 	}
 	p, err := suite.consumer.MultiGet(100)
 	c.Assert(err, Equals, nil)
-	c.Check(p[49].Reject(false), Not(Equals), nil)
+	c.Check(p[49].Fail(), Not(Equals), nil)
 	c.Check(p[48].MultiAck(), Equals, nil)
-	c.Check(p[49].Reject(false), Equals, nil)
+	c.Check(p[49].Fail(), Equals, nil)
 	c.Check(suite.consumer.GetUnackedLength(), Equals, int64(50))
 }
 

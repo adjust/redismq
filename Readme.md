@@ -127,18 +127,18 @@ Usage is pretty straight forward with the only difference being the `MultiAck()`
 	...
 }
 ```
-`MultiAck()` can be called on any package in the array with all the prior packages being "acked". This way you can `Reject()` single packages.
+`MultiAck()` can be called on any package in the array with all the prior packages being "acked". This way you can `Fail()` single packages.
 
 ### Reject and Failed Queues
 
-Similar to AMQP redismq supports `Failed Queues` meaning that packages that are rejected by a consumer will be stored in separate queue for further inspection. Alternatively a consumer can also `Reject()` a package and put it back into the queue:
+Similar to AMQP redismq supports `Failed Queues` meaning that packages that are rejected by a consumer will be stored in separate queue for further inspection. Alternatively a consumer can also `Requeue()` a package and put it back into the queue:
 ```go
 	...
 	package, err := consumer.Get()
 	if err != nil {
 		panic(err)
 	}
-	err = package.Reject(true)
+	err = package.Requeue()
 	if err != nil {
 		panic(err)
 	}
@@ -146,14 +146,14 @@ Similar to AMQP redismq supports `Failed Queues` meaning that packages that are 
 }
 ```
 
-To push the message into the `Failed Queue` of this consumer simply set the `requeue` flag to false:
+To push the message into the `Failed Queue` of this consumer simply use `Fail()`:
 ```go
 	...
 	package, err := consumer.Get()
 	if err != nil {
 		panic(err)
 	}
-	err = package.Reject(false)
+	err = package.Fail()
 	if err != nil {
 		panic(err)
 	}

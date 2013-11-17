@@ -28,23 +28,28 @@ type dataPoint struct {
 // CreateQueue return a queue that you can Put() or AddConsumer() to
 // Works like SelectQueue for existing queues
 func CreateQueue(redisURL, redisPassword string, redisDB int64, name string) *Queue {
+	return newQueue(redisURL, redisPassword, redisDB, name)
+}
+
+// SelectQueue returns a Queue if a queue with the name exists
+func SelectQueue(redisURL, redisPassword string, redisDB int64, name string) (queue *Queue, err error) {
+	redisClient := redis.NewTCPClient(redisURL, redisPassword, redisDB)
+	answer := redisClient.SIsMember(masterQueueKey(), name)
+	defer redisClient.Close()
+
+	if answer.Val() == false {
+		return nil, fmt.Errorf("queue with this name doesn't exist")
+	}
+
+	return newQueue(redisURL, redisPassword, redisDB, name), nil
+}
+
+func newQueue(redisURL, redisPassword string, redisDB int64, name string) *Queue {
 	q := &Queue{Name: name}
 	q.redisClient = redis.NewTCPClient(redisURL, redisPassword, redisDB)
 	q.redisClient.SAdd(masterQueueKey(), name)
 	q.startStatsWriter()
 	return q
-}
-
-// SelectQueue returns a Queue if a queue with the name exists
-func SelectQueue(redisURL, redisPassword string, redisDB int64, name string) (queue *Queue, err error) {
-	queue = &Queue{Name: name}
-	queue.redisClient = redis.NewTCPClient(redisURL, redisPassword, redisDB)
-	answer := queue.redisClient.SIsMember(masterQueueKey(), name)
-	if answer.Val() == false {
-		return nil, fmt.Errorf("queue with this name doesn't exist")
-	}
-	queue.startStatsWriter()
-	return queue, nil
 }
 
 // Put writes the payload into the input queue

@@ -138,7 +138,7 @@ func (consumer *Consumer) RequeueWorking() error {
 		if err != nil {
 			return err
 		}
-		p.Reject(true)
+		p.Requeue()
 	}
 	return nil
 }
