@@ -25,7 +25,7 @@ type dataPoint struct {
 }
 
 // ListQueues return a list of all queues registed with redismq
-func ListQueues(redisURL, redisPassword string, redisDB int64, name string) (queues []string, err error) {
+func ListQueues(redisURL, redisPassword string, redisDB int64) (queues []string, err error) {
 	redisClient := redis.NewTCPClient(redisURL, redisPassword, redisDB)
 	answer := redisClient.SMembers(masterQueueKey())
 	return answer.Val(), answer.Err()
