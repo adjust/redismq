@@ -24,6 +24,13 @@ type dataPoint struct {
 	incr  bool
 }
 
+// ListQueues return a list of all queues registed with redismq
+func ListQueues(redisURL, redisPassword string, redisDB int64, name string) (queues []string, err error) {
+	redisClient := redis.NewTCPClient(redisURL, redisPassword, redisDB)
+	answer := redisClient.SMembers(masterQueueKey())
+	return answer.Val(), answer.Err()
+}
+
 // CreateQueue return a queue that you can Put() or AddConsumer() to
 // Works like SelectQueue for existing queues
 func CreateQueue(redisURL, redisPassword string, redisDB int64, name string) *Queue {
@@ -49,6 +56,49 @@ func newQueue(redisURL, redisPassword string, redisDB int64, name string) *Queue
 	q.redisClient.SAdd(masterQueueKey(), name)
 	q.startStatsWriter()
 	return q
+}
+
+// Delete clears all input and failed queues as well as all consumers
+// will not proceed as long as consumers are running
+func (queue *Queue) Delete() error {
+	consumers, err := queue.getConsumers()
+	if err != nil {
+		return err
+	}
+
+	for _, name := range consumers {
+		if queue.isActiveConsumer(name) {
+			return fmt.Errorf("cannot delete queue with active consumers")
+		}
+
+		consumer, err := queue.AddConsumer(name)
+		if err != nil {
+			return err
+		}
+
+		err = consumer.ResetWorking()
+		if err != nil {
+			return err
+		}
+
+		queue.redisClient.SRem(queueWorkersKey(queue.Name), name).Val()
+	}
+
+	err = queue.ResetInput()
+	if err != nil {
+		return err
+	}
+
+	err = queue.ResetFailed()
+	if err != nil {
+		return err
+	}
+
+	queue.redisClient.SRem(masterQueueKey(), queue.Name)
+	queue.redisClient.Del(queueWorkersKey(queue.Name))
+
+	err = queue.redisClient.Close()
+	return err
 }
 
 // Put writes the payload into the input queue
@@ -151,4 +201,12 @@ func (queue *Queue) writeStatsCacheToRedis(now int64) {
 		delete(queue.rateStatsCache, sec)
 	}
 	queue.lastStatsWrite = now
+}
+
+func (queue *Queue) isActiveConsumer(name string) bool {
+	val := queue.redisClient.Get(consumerHeartbeatKey(queue.Name, name)).Val()
+	if val == "ping" {
+		return true
+	}
+	return false
 }
