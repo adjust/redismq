@@ -9,7 +9,7 @@ notifications:
 services:
   - redis
 
-script: go test -v ./test
+script: go test -v
 
 install:
   - go get -u github.com/adeven/redis

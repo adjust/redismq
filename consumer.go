@@ -27,12 +27,32 @@ func (queue *Queue) AddConsumer(name string) (c *Consumer, err error) {
 	return c, nil
 }
 
-// Get returns a single package from the queue
+// Get returns a single package from the queue (blocking)
 func (consumer *Consumer) Get() (*Package, error) {
 	if consumer.HasUnacked() {
 		return nil, fmt.Errorf("unacked Packages found")
 	}
 	return consumer.unsafeGet()
+}
+
+// NoWaitGet returns a single package from the queue (returns nil, nil if no package in queue)
+func (consumer *Consumer) NoWaitGet() (*Package, error) {
+	if consumer.HasUnacked() {
+		return nil, fmt.Errorf("unacked Packages found")
+	}
+	answer := consumer.Queue.redisClient.RPopLPush(
+		queueInputKey(consumer.Queue.Name),
+		consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
+		0,
+	)
+	if answer.Val() == "" {
+		return nil, nil
+	}
+	consumer.Queue.incrRate(
+		consumerWorkingRateKey(consumer.Queue.Name, consumer.Name),
+		1,
+	)
+	return consumer.parseRedisAnswer(answer)
 }
 
 // MultiGet returns an array of packages from the queue
