@@ -18,8 +18,7 @@ func (queue *Queue) AddConsumer(name string) (c *Consumer, err error) {
 	//check uniqueness and start heartbeat
 	added := queue.redisClient.SAdd(queueWorkersKey(queue.Name), name).Val()
 	if added == 0 {
-		val := queue.redisClient.Get(consumerHeartbeatKey(queue.Name, name)).Val()
-		if val == "ping" {
+		if queue.isActiveConsumer(name) {
 			return nil, fmt.Errorf("consumer with this name is already active")
 		}
 	}
