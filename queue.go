@@ -24,6 +24,13 @@ type dataPoint struct {
 	incr  bool
 }
 
+// ListQueues return a list of all queues registed with redismq
+func ListQueues(redisURL, redisPassword string, redisDB int64, name string) (queues []string, err error) {
+	redisClient := redis.NewTCPClient(redisURL, redisPassword, redisDB)
+	answer := redisClient.SMembers(masterQueueKey())
+	return answer.Val(), answer.Err()
+}
+
 // CreateQueue return a queue that you can Put() or AddConsumer() to
 // Works like SelectQueue for existing queues
 func CreateQueue(redisURL, redisPassword string, redisDB int64, name string) *Queue {
