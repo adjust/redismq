@@ -83,8 +83,17 @@ func (pack *Package) Ack() error {
 	return err
 }
 
-// Reject either requeues a package (with requeue=true) back to input or moves it to failed
-func (pack *Package) Reject(requeue bool) error {
+// Requeue moves a package back to input
+func (pack *Package) Requeue() error {
+	return pack.reject(true)
+}
+
+// Fail moves a package to the failed queue
+func (pack *Package) Fail() error {
+	return pack.reject(false)
+}
+
+func (pack *Package) reject(requeue bool) error {
 	if pack.Collection != nil && (*pack.Collection)[pack.index()-1].Acked == false {
 		return fmt.Errorf("cannot reject package while unacked package before it")
 	}

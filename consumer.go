@@ -27,12 +27,31 @@ func (queue *Queue) AddConsumer(name string) (c *Consumer, err error) {
 	return c, nil
 }
 
-// Get returns a single package from the queue
+// Get returns a single package from the queue (blocking)
 func (consumer *Consumer) Get() (*Package, error) {
 	if consumer.HasUnacked() {
 		return nil, fmt.Errorf("unacked Packages found")
 	}
 	return consumer.unsafeGet()
+}
+
+// NoWaitGet returns a single package from the queue (returns nil, nil if no package in queue)
+func (consumer *Consumer) NoWaitGet() (*Package, error) {
+	if consumer.HasUnacked() {
+		return nil, fmt.Errorf("unacked Packages found")
+	}
+	answer := consumer.Queue.redisClient.RPopLPush(
+		queueInputKey(consumer.Queue.Name),
+		consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
+	)
+	if answer.Val() == "" {
+		return nil, nil
+	}
+	consumer.Queue.incrRate(
+		consumerWorkingRateKey(consumer.Queue.Name, consumer.Name),
+		1,
+	)
+	return consumer.parseRedisAnswer(answer)
 }
 
 // MultiGet returns an array of packages from the queue
@@ -77,10 +96,9 @@ func (consumer *Consumer) MultiGet(length int) ([]*Package, error) {
 			collection = append(collection, p)
 		}
 	}
-	consumer.Queue.trackStats(
+	consumer.Queue.incrRate(
 		consumerWorkingRateKey(consumer.Queue.Name, consumer.Name),
 		int64(length),
-		true,
 	)
 
 	return collection, nil
@@ -118,9 +136,9 @@ func (consumer *Consumer) GetFailed() (*Package, error) {
 		queueFailedKey(consumer.Queue.Name),
 		consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
 	)
-	consumer.Queue.trackStats(
+	consumer.Queue.incrRate(
 		consumerWorkingRateKey(consumer.Queue.Name, consumer.Name),
-		1, true,
+		1,
 	)
 	return consumer.parseRedisAnswer(answer)
 }
@@ -138,7 +156,7 @@ func (consumer *Consumer) RequeueWorking() error {
 		if err != nil {
 			return err
 		}
-		p.Reject(true)
+		p.Requeue()
 	}
 	return nil
 }
@@ -153,7 +171,7 @@ func (consumer *Consumer) requeuePackage(p *Package) error {
 		consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
 		queueInputKey(consumer.Queue.Name),
 	)
-	consumer.Queue.trackStats(queueInputRateKey(consumer.Queue.Name), 1, true)
+	consumer.Queue.incrRate(queueInputRateKey(consumer.Queue.Name), 1)
 	return answer.Err()
 }
 
@@ -203,10 +221,9 @@ func (consumer *Consumer) unsafeGet() (*Package, error) {
 		consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
 		0,
 	)
-	consumer.Queue.trackStats(
+	consumer.Queue.incrRate(
 		consumerWorkingRateKey(consumer.Queue.Name, consumer.Name),
 		1,
-		true,
 	)
 	return consumer.parseRedisAnswer(answer)
 }

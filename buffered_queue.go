@@ -91,7 +91,7 @@ func (queue *BufferedQueue) startWritingBufferToRedis() {
 					a = append(a, p.getString())
 				}
 				queue.redisClient.LPush(queueInputKey(queue.Name), a...)
-				queue.trackStats(queueInputRateKey(queue.Name), int64(size), true)
+				queue.incrRate(queueInputRateKey(queue.Name), int64(size))
 				for i := 0; i < len(queue.flushStatus); i++ {
 					c := <-queue.flushStatus
 					c <- true
