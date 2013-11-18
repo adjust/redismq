@@ -43,7 +43,6 @@ func (consumer *Consumer) NoWaitGet() (*Package, error) {
 	answer := consumer.Queue.redisClient.RPopLPush(
 		queueInputKey(consumer.Queue.Name),
 		consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
-		0,
 	)
 	if answer.Val() == "" {
 		return nil, nil
