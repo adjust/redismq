@@ -61,17 +61,18 @@ func NewObserver(redisURL, redisPassword string, redisDb int64) *Observer {
 
 // UpdateAllStats fetches stats for all queues and all their consumers
 func (observer *Observer) UpdateAllStats() {
-	queues, err := observer.getAllQueues()
+	queues, err := observer.GetAllQueues()
 	if err != nil {
 		log.Fatalf("ERROR FETCHING QUEUES %s", err.Error())
 	}
 
 	for _, queue := range queues {
-		observer.UdpateQueueStats(queue)
+		observer.UpdateQueueStats(queue)
 	}
 }
 
-func (observer *Observer) getAllQueues() (queues []string, err error) {
+// GetAllQueues returns a list of all registed queues
+func (observer *Observer) GetAllQueues() (queues []string, err error) {
 	answer := observer.redisClient.SMembers(masterQueueKey())
 	return answer.Val(), answer.Err()
 }
@@ -81,8 +82,8 @@ func (observer *Observer) getConsumers(queue string) (consumers []string, err er
 	return answer.Val(), answer.Err()
 }
 
-// UdpateQueueStats fetches stats for one specific queue and its consumers
-func (observer *Observer) UdpateQueueStats(queue string) {
+// UpdateQueueStats fetches stats for one specific queue and its consumers
+func (observer *Observer) UpdateQueueStats(queue string) {
 	if observer.Stats[queue] == nil {
 		observer.Stats[queue] = &queueStat{ConsumerStats: make(map[string]*consumerStat)}
 	}
