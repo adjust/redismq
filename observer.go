@@ -149,12 +149,6 @@ func (observer *Observer) fetchStat(keyName string, seconds int64) int64 {
 		num, _ := strconv.ParseInt(val.(string), 10, 64)
 		sum += num
 	}
-	if seconds == 60 {
-		log.Println(len(answer.Val()))
-		log.Println(sum)
-		log.Println(nilVal)
-		log.Println("")
-	}
 	return sum / seconds
 }
 
