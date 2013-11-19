@@ -9,69 +9,98 @@ import (
 	"time"
 )
 
-// this is a very simple implementation of a statistics observer
-// far more complex things can be implemented with the way stats are written
-type observer struct {
+// Observer is a very simple implementation of an statistics observer
+// far more complex things could be implemented with the way stats are written
+// for now it allows basic access
+// to throughput rates and queue size averaged over seconds, minutes and hours
+type Observer struct {
 	redisClient   *redis.Client `json:"-"`
-	RedisURL      string        `json:"-"`
-	RedisPassword string        `json:"-"`
-	RedisDb       int64         `json:"-"`
+	redisURL      string        `json:"-"`
+	redisPassword string        `json:"-"`
+	redisDb       int64         `json:"-"`
 	Stats         map[string]*queueStat
 }
 
 type queueStat struct {
-	InputRate     int64
-	WorkRate      int64
-	InputSize     int64
-	FailSize      int64
+	InputSizeSecond int64
+	InputSizeMinute int64
+	InputSizeHour   int64
+
+	FailSizeSecond int64
+	FailSizeMinute int64
+	FailSizeHour   int64
+
+	InputRateSecond int64
+	InputRateMinute int64
+	InputRateHour   int64
+
+	WorkRateSecond int64
+	WorkRateMinute int64
+	WorkRateHour   int64
+
 	ConsumerStats map[string]*consumerStat
 }
 
 type consumerStat struct {
-	WorkRate int64
+	WorkRateSecond int64
+	WorkRateMinute int64
+	WorkRateHour   int64
 }
 
-func newObserver(redisURL, redisPassword string, redisDb int64) *observer {
-	q := &observer{
-		RedisURL:      redisURL,
-		RedisPassword: redisPassword,
-		RedisDb:       redisDb,
+// NewObserver returns an Oberserver to monitor different statistics from redis
+func NewObserver(redisURL, redisPassword string, redisDb int64) *Observer {
+	q := &Observer{
+		redisURL:      redisURL,
+		redisPassword: redisPassword,
+		redisDb:       redisDb,
 		Stats:         make(map[string]*queueStat),
 	}
 	q.redisClient = redis.NewTCPClient(redisURL, redisPassword, redisDb)
 	return q
 }
 
-func (observer *observer) getAllQueues() (queues []string, err error) {
-	answer := observer.redisClient.SMembers(masterQueueKey())
-	return answer.Val(), answer.Err()
-}
-
-func (observer *observer) getConsumers(queue string) (consumers []string, err error) {
-	answer := observer.redisClient.SMembers(queueWorkersKey(queue))
-	return answer.Val(), answer.Err()
-}
-
-func (observer *observer) update() {
+// UpdateAllStats fetches stats for all queues and all their consumers
+func (observer *Observer) UpdateAllStats() {
 	queues, err := observer.getAllQueues()
 	if err != nil {
 		log.Fatalf("ERROR FETCHING QUEUES %s", err.Error())
 	}
 
 	for _, queue := range queues {
-		observer.poll(queue)
+		observer.UdpateQueueStats(queue)
 	}
 }
 
-func (observer *observer) poll(queue string) {
+func (observer *Observer) getAllQueues() (queues []string, err error) {
+	answer := observer.redisClient.SMembers(masterQueueKey())
+	return answer.Val(), answer.Err()
+}
+
+func (observer *Observer) getConsumers(queue string) (consumers []string, err error) {
+	answer := observer.redisClient.SMembers(queueWorkersKey(queue))
+	return answer.Val(), answer.Err()
+}
+
+// UdpateQueueStats fetches stats for one specific queue and its consumers
+func (observer *Observer) UdpateQueueStats(queue string) {
 	if observer.Stats[queue] == nil {
 		observer.Stats[queue] = &queueStat{ConsumerStats: make(map[string]*consumerStat)}
 	}
-	observer.Stats[queue].InputRate = observer.fetchStat(queueInputRateKey(queue))
-	observer.Stats[queue].InputSize = observer.fetchStat(queueInputSizeKey(queue))
-	observer.Stats[queue].FailSize = observer.fetchStat(queueFailedSizeKey(queue))
+	observer.Stats[queue].InputRateSecond = observer.fetchStat(queueInputRateKey(queue), 1)
+	observer.Stats[queue].InputSizeSecond = observer.fetchStat(queueInputSizeKey(queue), 1)
+	observer.Stats[queue].FailSizeSecond = observer.fetchStat(queueFailedSizeKey(queue), 1)
 
-	observer.Stats[queue].WorkRate = 0
+	observer.Stats[queue].InputRateMinute = observer.fetchStat(queueInputRateKey(queue), 60)
+	observer.Stats[queue].InputSizeMinute = observer.fetchStat(queueInputSizeKey(queue), 60)
+	observer.Stats[queue].FailSizeMinute = observer.fetchStat(queueFailedSizeKey(queue), 60)
+
+	observer.Stats[queue].InputRateHour = observer.fetchStat(queueInputRateKey(queue), 3600)
+	observer.Stats[queue].InputSizeHour = observer.fetchStat(queueInputSizeKey(queue), 3600)
+	observer.Stats[queue].FailSizeHour = observer.fetchStat(queueFailedSizeKey(queue), 3600)
+
+	observer.Stats[queue].WorkRateSecond = 0
+	observer.Stats[queue].WorkRateMinute = 0
+	observer.Stats[queue].WorkRateHour = 0
 
 	consumers, err := observer.getConsumers(queue)
 	if err != nil {
@@ -80,30 +109,56 @@ func (observer *observer) poll(queue string) {
 	}
 
 	for _, consumer := range consumers {
-		if observer.Stats[queue].ConsumerStats[consumer] == nil {
-			observer.Stats[queue].ConsumerStats[consumer] = &consumerStat{}
-		}
-		observer.Stats[queue].ConsumerStats[consumer].WorkRate = observer.fetchStat(consumerWorkingRateKey(queue, consumer))
-		observer.Stats[queue].WorkRate += observer.Stats[queue].ConsumerStats[consumer].WorkRate
+		stat := &consumerStat{}
+
+		stat.WorkRateSecond = observer.fetchStat(consumerWorkingRateKey(queue, consumer), 1)
+		stat.WorkRateMinute = observer.fetchStat(consumerWorkingRateKey(queue, consumer), 60)
+		stat.WorkRateHour = observer.fetchStat(consumerWorkingRateKey(queue, consumer), 3600)
+
+		observer.Stats[queue].WorkRateSecond += stat.WorkRateSecond
+		observer.Stats[queue].WorkRateMinute += stat.WorkRateMinute
+		observer.Stats[queue].WorkRateHour += stat.WorkRateHour
+
+		observer.Stats[queue].ConsumerStats[consumer] = stat
 	}
 }
 
-func (observer *observer) fetchStat(keyName string) int64 {
-	now := time.Now().UTC().Unix() - 3 // we can only look for already written stats
-	key := fmt.Sprintf("%s::%d", keyName, now)
-	answer := observer.redisClient.Get(key)
+// TODO the current implementation does not handle gaps for queue size
+// which appear for queues with little or no traffic
+func (observer *Observer) fetchStat(keyName string, seconds int64) int64 {
+	now := time.Now().UTC().Unix() - 2 // we can only look for already written stats
+	keys := make([]string, 0)
+
+	for i := int64(0); i < seconds; i++ {
+		key := fmt.Sprintf("%s::%d", keyName, now)
+		keys = append(keys, key)
+		now--
+	}
+	answer := observer.redisClient.MGet(keys...)
 	if answer.Err() != nil {
 		return 0
 	}
-	i, err := strconv.ParseInt(answer.Val(), 10, 64)
-	if err != nil {
-		return 0
+	nilVal := 0
+	sum := int64(0)
+	for _, val := range answer.Val() {
+		if val == nil {
+			nilVal++
+			continue
+		}
+		num, _ := strconv.ParseInt(val.(string), 10, 64)
+		sum += num
 	}
-	return i
+	if seconds == 60 {
+		log.Println(len(answer.Val()))
+		log.Println(sum)
+		log.Println(nilVal)
+		log.Println("")
+	}
+	return sum / seconds
 }
 
-func (observer *observer) OutputToString() string {
-	observer.update()
+// ToJSON renders the whole observer as a JSON string
+func (observer *Observer) ToJSON() string {
 	json, err := json.Marshal(observer)
 	if err != nil {
 		log.Fatalf("ERROR MARSHALLING OVERSEER %s", err.Error())

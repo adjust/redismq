@@ -9,12 +9,12 @@ import (
 // Server is the web server API for monitoring via JSON
 type Server struct {
 	port     string
-	observer *observer
+	observer *Observer
 }
 
 // NewServer returns a Server that can be started with Start()
 func NewServer(redisURL, redisPassword string, redisDb int64, port string) *Server {
-	observer := newObserver(redisURL, redisPassword, redisDb)
+	observer := NewObserver(redisURL, redisPassword, redisDb)
 	s := &Server{
 		port:     port,
 		observer: observer,
@@ -39,16 +39,17 @@ func (server *Server) Start() {
 }
 
 type statisticsHandler struct {
-	*observer
+	*Observer
 }
 
-func newStatisticsHandler(observer *observer) *statisticsHandler {
+func newStatisticsHandler(observer *Observer) *statisticsHandler {
 	handler := &statisticsHandler{
-		observer: observer,
+		Observer: observer,
 	}
 	return handler
 }
 
 func (handler *statisticsHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	fmt.Fprintln(writer, handler.observer.OutputToString())
+	handler.Observer.UpdateAllStats()
+	fmt.Fprintln(writer, handler.Observer.ToJSON())
 }
