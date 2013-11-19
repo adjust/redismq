@@ -90,11 +90,11 @@ func (observer *Observer) UpdateQueueStats(queue string) {
 
 	queueStats.InputRateSecond = observer.fetchStat(queueInputRateKey(queue), 1)
 	queueStats.InputSizeSecond = observer.fetchStat(queueInputSizeKey(queue), 1)
-	observer.Stats[queue].FailSizeSecond = observer.fetchStat(queueFailedSizeKey(queue), 1)
+	queueStats.FailSizeSecond = observer.fetchStat(queueFailedSizeKey(queue), 1)
 
 	queueStats.InputRateMinute = observer.fetchStat(queueInputRateKey(queue), 60)
 	queueStats.InputSizeMinute = observer.fetchStat(queueInputSizeKey(queue), 60)
-	observer.Stats[queue].FailSizeMinute = observer.fetchStat(queueFailedSizeKey(queue), 60)
+	queueStats.FailSizeMinute = observer.fetchStat(queueFailedSizeKey(queue), 60)
 
 	queueStats.InputRateHour = observer.fetchStat(queueInputRateKey(queue), 3600)
 	queueStats.InputSizeHour = observer.fetchStat(queueInputSizeKey(queue), 3600)
@@ -103,8 +103,6 @@ func (observer *Observer) UpdateQueueStats(queue string) {
 	queueStats.WorkRateSecond = 0
 	queueStats.WorkRateMinute = 0
 	queueStats.WorkRateHour = 0
-
-	observer.Stats[queue] = queueStats
 
 	consumers, err := observer.getConsumers(queue)
 	if err != nil {
@@ -119,12 +117,14 @@ func (observer *Observer) UpdateQueueStats(queue string) {
 		stat.WorkRateMinute = observer.fetchStat(consumerWorkingRateKey(queue, consumer), 60)
 		stat.WorkRateHour = observer.fetchStat(consumerWorkingRateKey(queue, consumer), 3600)
 
-		observer.Stats[queue].WorkRateSecond += stat.WorkRateSecond
-		observer.Stats[queue].WorkRateMinute += stat.WorkRateMinute
-		observer.Stats[queue].WorkRateHour += stat.WorkRateHour
+		queueStats.WorkRateSecond += stat.WorkRateSecond
+		queueStats.WorkRateMinute += stat.WorkRateMinute
+		queueStats.WorkRateHour += stat.WorkRateHour
 
-		observer.Stats[queue].ConsumerStats[consumer] = stat
+		queueStats.ConsumerStats[consumer] = stat
 	}
+
+	observer.Stats[queue] = queueStats
 }
 
 // TODO the current implementation does not handle gaps for queue size
