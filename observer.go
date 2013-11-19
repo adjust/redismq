@@ -18,10 +18,11 @@ type Observer struct {
 	redisURL      string        `json:"-"`
 	redisPassword string        `json:"-"`
 	redisDb       int64         `json:"-"`
-	Stats         map[string]*queueStat
+	Stats         map[string]*QueueStat
 }
 
-type queueStat struct {
+// QueueStat collects data about a queue
+type QueueStat struct {
 	InputSizeSecond int64
 	InputSizeMinute int64
 	InputSizeHour   int64
@@ -38,10 +39,11 @@ type queueStat struct {
 	WorkRateMinute int64
 	WorkRateHour   int64
 
-	ConsumerStats map[string]*consumerStat
+	ConsumerStats map[string]*ConsumerStat
 }
 
-type consumerStat struct {
+// ConsumerStat collects data about a queues consumer
+type ConsumerStat struct {
 	WorkRateSecond int64
 	WorkRateMinute int64
 	WorkRateHour   int64
@@ -53,7 +55,7 @@ func NewObserver(redisURL, redisPassword string, redisDb int64) *Observer {
 		redisURL:      redisURL,
 		redisPassword: redisPassword,
 		redisDb:       redisDb,
-		Stats:         make(map[string]*queueStat),
+		Stats:         make(map[string]*QueueStat),
 	}
 	q.redisClient = redis.NewTCPClient(redisURL, redisPassword, redisDb)
 	return q
@@ -84,24 +86,25 @@ func (observer *Observer) getConsumers(queue string) (consumers []string, err er
 
 // UpdateQueueStats fetches stats for one specific queue and its consumers
 func (observer *Observer) UpdateQueueStats(queue string) {
-	if observer.Stats[queue] == nil {
-		observer.Stats[queue] = &queueStat{ConsumerStats: make(map[string]*consumerStat)}
-	}
-	observer.Stats[queue].InputRateSecond = observer.fetchStat(queueInputRateKey(queue), 1)
-	observer.Stats[queue].InputSizeSecond = observer.fetchStat(queueInputSizeKey(queue), 1)
+	queueStats := &QueueStat{ConsumerStats: make(map[string]*ConsumerStat)}
+
+	queueStats.InputRateSecond = observer.fetchStat(queueInputRateKey(queue), 1)
+	queueStats.InputSizeSecond = observer.fetchStat(queueInputSizeKey(queue), 1)
 	observer.Stats[queue].FailSizeSecond = observer.fetchStat(queueFailedSizeKey(queue), 1)
 
-	observer.Stats[queue].InputRateMinute = observer.fetchStat(queueInputRateKey(queue), 60)
-	observer.Stats[queue].InputSizeMinute = observer.fetchStat(queueInputSizeKey(queue), 60)
+	queueStats.InputRateMinute = observer.fetchStat(queueInputRateKey(queue), 60)
+	queueStats.InputSizeMinute = observer.fetchStat(queueInputSizeKey(queue), 60)
 	observer.Stats[queue].FailSizeMinute = observer.fetchStat(queueFailedSizeKey(queue), 60)
 
-	observer.Stats[queue].InputRateHour = observer.fetchStat(queueInputRateKey(queue), 3600)
-	observer.Stats[queue].InputSizeHour = observer.fetchStat(queueInputSizeKey(queue), 3600)
-	observer.Stats[queue].FailSizeHour = observer.fetchStat(queueFailedSizeKey(queue), 3600)
+	queueStats.InputRateHour = observer.fetchStat(queueInputRateKey(queue), 3600)
+	queueStats.InputSizeHour = observer.fetchStat(queueInputSizeKey(queue), 3600)
+	queueStats.FailSizeHour = observer.fetchStat(queueFailedSizeKey(queue), 3600)
 
-	observer.Stats[queue].WorkRateSecond = 0
-	observer.Stats[queue].WorkRateMinute = 0
-	observer.Stats[queue].WorkRateHour = 0
+	queueStats.WorkRateSecond = 0
+	queueStats.WorkRateMinute = 0
+	queueStats.WorkRateHour = 0
+
+	observer.Stats[queue] = queueStats
 
 	consumers, err := observer.getConsumers(queue)
 	if err != nil {
@@ -110,7 +113,7 @@ func (observer *Observer) UpdateQueueStats(queue string) {
 	}
 
 	for _, consumer := range consumers {
-		stat := &consumerStat{}
+		stat := &ConsumerStat{}
 
 		stat.WorkRateSecond = observer.fetchStat(consumerWorkingRateKey(queue, consumer), 1)
 		stat.WorkRateMinute = observer.fetchStat(consumerWorkingRateKey(queue, consumer), 60)
