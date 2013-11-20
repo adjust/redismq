@@ -24,22 +24,16 @@ type dataPoint struct {
 	incr  bool
 }
 
-// ListQueues return a list of all queues registed with redismq
-func ListQueues(redisURL, redisPassword string, redisDB int64) (queues []string, err error) {
-	redisClient := redis.NewTCPClient(redisURL, redisPassword, redisDB)
-	answer := redisClient.SMembers(masterQueueKey())
-	return answer.Val(), answer.Err()
-}
-
 // CreateQueue return a queue that you can Put() or AddConsumer() to
 // Works like SelectQueue for existing queues
-func CreateQueue(redisURL, redisPassword string, redisDB int64, name string) *Queue {
-	return newQueue(redisURL, redisPassword, redisDB, name)
+func CreateQueue(redisHost, redisPort, redisPassword string, redisDB int64, name string) *Queue {
+	return newQueue(redisHost, redisPort, redisPassword, redisDB, name)
 }
 
 // SelectQueue returns a Queue if a queue with the name exists
-func SelectQueue(redisURL, redisPassword string, redisDB int64, name string) (queue *Queue, err error) {
-	redisClient := redis.NewTCPClient(redisURL, redisPassword, redisDB)
+func SelectQueue(redisHost, redisPort, redisPassword string, redisDB int64, name string) (queue *Queue, err error) {
+
+	redisClient := redis.NewTCPClient(redisHost+":"+redisPort, redisPassword, redisDB)
 	answer := redisClient.SIsMember(masterQueueKey(), name)
 	defer redisClient.Close()
 
@@ -47,12 +41,12 @@ func SelectQueue(redisURL, redisPassword string, redisDB int64, name string) (qu
 		return nil, fmt.Errorf("queue with this name doesn't exist")
 	}
 
-	return newQueue(redisURL, redisPassword, redisDB, name), nil
+	return newQueue(redisHost, redisPort, redisPassword, redisDB, name), nil
 }
 
-func newQueue(redisURL, redisPassword string, redisDB int64, name string) *Queue {
+func newQueue(redisHost, redisPort, redisPassword string, redisDB int64, name string) *Queue {
 	q := &Queue{Name: name}
-	q.redisClient = redis.NewTCPClient(redisURL, redisPassword, redisDB)
+	q.redisClient = redis.NewTCPClient(redisHost+":"+redisPort, redisPassword, redisDB)
 	q.redisClient.SAdd(masterQueueKey(), name)
 	q.startStatsWriter()
 	return q

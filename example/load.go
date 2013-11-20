@@ -9,9 +9,9 @@ import (
 
 func main() {
 	runtime.GOMAXPROCS(5)
-	server := redismq.NewServer("localhost:6379", "", 9, "9999")
+	server := redismq.NewServer("localhost", "6379", "", 9, "9999")
 	server.Start()
-	queue := redismq.CreateQueue("localhost:6379", "", 9, "example")
+	queue := redismq.CreateQueue("localhost", "6379", "", 9, "example")
 	go write(queue)
 	go read(queue, "1")
 	go read(queue, "2")

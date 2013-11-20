@@ -10,9 +10,9 @@ import (
 // This example demonstrates maximum performance
 func main() {
 	runtime.GOMAXPROCS(8)
-	server := redismq.NewServer("localhost:6379", "", 9, "9999")
+	server := redismq.NewServer("localhost", "6379", "", 9, "9999")
 	server.Start()
-	testQueue := redismq.CreateBufferedQueue("localhost:6379", "", 9, "example", 200)
+	testQueue := redismq.CreateBufferedQueue("localhost", "6379", "", 9, "example", 200)
 	err := testQueue.Start()
 	if err != nil {
 		panic(err)

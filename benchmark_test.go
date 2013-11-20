@@ -24,14 +24,14 @@ var _ = Suite(&BenchmarkSuite{})
 func (suite *BenchmarkSuite) SetUpSuite(c *C) {
 	runtime.GOMAXPROCS(8)
 	rand.Seed(time.Now().UTC().UnixNano())
-	suite.queue1k = CreateQueue(redisURL, redisPassword, redisDB, "teststuff1k")
-	suite.queue4k = CreateQueue(redisURL, redisPassword, redisDB, "teststuff4k")
+	suite.queue1k = CreateQueue(redisHost, redisPort, redisPassword, redisDB, "teststuff1k")
+	suite.queue4k = CreateQueue(redisHost, redisPort, redisPassword, redisDB, "teststuff4k")
 	suite.consumer1k, _ = suite.queue1k.AddConsumer("testconsumer")
 	suite.consumer4k, _ = suite.queue4k.AddConsumer("testconsumer")
 
 	suite.mutliConsumer1k = make([]*Consumer, 0)
 	for i := 0; i < 4; i++ {
-		q := CreateQueue(redisURL, redisPassword, redisDB, "teststuff1k")
+		q := CreateQueue(redisHost, redisPort, redisPassword, redisDB, "teststuff1k")
 		c, err := q.AddConsumer("c" + strconv.Itoa(i))
 		if err != nil {
 			panic(err)
@@ -40,7 +40,7 @@ func (suite *BenchmarkSuite) SetUpSuite(c *C) {
 	}
 	suite.mutliConsumer4k = make([]*Consumer, 0)
 	for i := 0; i < 4; i++ {
-		q := CreateQueue(redisURL, redisPassword, redisDB, "teststuff4k")
+		q := CreateQueue(redisHost, redisPort, redisPassword, redisDB, "teststuff4k")
 		c, err := q.AddConsumer("c" + strconv.Itoa(i))
 		if err != nil {
 			panic(err)

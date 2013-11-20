@@ -15,7 +15,8 @@ import (
 // to throughput rates and queue size averaged over seconds, minutes and hours
 type Observer struct {
 	redisClient   *redis.Client `json:"-"`
-	redisURL      string        `json:"-"`
+	redisHost     string        `json:"-"`
+	redisPort     string        `json:"-"`
 	redisPassword string        `json:"-"`
 	redisDb       int64         `json:"-"`
 	Stats         map[string]*QueueStat
@@ -50,14 +51,15 @@ type ConsumerStat struct {
 }
 
 // NewObserver returns an Oberserver to monitor different statistics from redis
-func NewObserver(redisURL, redisPassword string, redisDb int64) *Observer {
+func NewObserver(redisHost, redisPort, redisPassword string, redisDb int64) *Observer {
 	q := &Observer{
-		redisURL:      redisURL,
+		redisHost:     redisHost,
+		redisPort:     redisPort,
 		redisPassword: redisPassword,
 		redisDb:       redisDb,
 		Stats:         make(map[string]*QueueStat),
 	}
-	q.redisClient = redis.NewTCPClient(redisURL, redisPassword, redisDb)
+	q.redisClient = redis.NewTCPClient(redisHost+":"+redisPort, redisPassword, redisDb)
 	return q
 }
 
