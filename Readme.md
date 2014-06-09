@@ -1,6 +1,6 @@
 # redismq
 
-[![Build Status](https://secure.travis-ci.org/adeven/redismq.png)](http://travis-ci.org/adeven/redismq)
+[![Build Status](https://secure.travis-ci.org/adjust/redismq.png)](http://travis-ci.org/adjust/redismq)
 
 ## What is this
 
@@ -21,8 +21,8 @@ If you want to use this with any other language than go you have to translate al
 
 ## How to use it
 
-All most all use cases are either covered in the [examples](https://github.com/adeven/redismq/tree/master/example)
-or in the [tests](https://github.com/adeven/redismq/tree/master/test).
+All most all use cases are either covered in the [examples](https://github.com/adjust/redismq/tree/master/example)
+or in the [tests](https://github.com/adjust/redismq/tree/master/test).
 
 So the best idea is just to read those and figure it from there. But in any case:
 
@@ -35,7 +35,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/adeven/redismq"
+	"github.com/adjust/redismq"
 )
 
 func main() {
@@ -51,7 +51,7 @@ To write into the queue you simply use `Put()`:
 	...
 }
 ```
-The payload can be any kind of string, yes even a [10MB one](https://github.com/adeven/redismq/blob/master/test/integration_test.go#L217).
+The payload can be any kind of string, yes even a [10MB one](https://github.com/adjust/redismq/blob/master/test/integration_test.go#L217).
 
 To get messages out of the queue you need a consumer:
 ```go
@@ -194,5 +194,5 @@ As redis is the underlying storage engine you can set your desired persistence s
 With somewhat sane settings you should see no significant performance decrease.
 
 ## Copyright
-redismq is Copyright © 2013 adeven (Paul H. Müller). It is free software, and may be redistributed under the terms
+redismq is Copyright © 2013 adjust (Paul H. Müller). It is free software, and may be redistributed under the terms
 specified in the LICENSE file.
