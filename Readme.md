@@ -194,5 +194,7 @@ As redis is the underlying storage engine you can set your desired persistence s
 With somewhat sane settings you should see no significant performance decrease.
 
 ## Copyright
-redismq is Copyright © 2013 adjust (Paul H. Müller). It is free software, and may be redistributed under the terms
+redismq is Copyright © 2014 adjust GmbH.
+
+It is free software, and may be redistributed under the terms
 specified in the LICENSE file.
