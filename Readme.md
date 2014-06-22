@@ -173,17 +173,17 @@ The InputRate is the number of messages per second that get inserted, WorkRate t
 
 Single Publisher, Two Consumers only atomic `Get` and `Put`
 ```
-InputRate:	10946
-WorkRate:	7421
+InputRate:	12183
+WorkRate:	12397
 ```
 
 Single Publisher, Two Consumers using `BufferedQueues` and `MultiGet`
 ```
-InputRate:	37700
-WorkRate:	21500
+InputRate:	46994
+WorkRate:	25000
 ```
 
-And yes that is a persistent message queue that can move almost 60k messages per second.
+And yes that is a persistent message queue that can move over 70k messages per second.
 
 If you want to find out for yourself checkout the `example` folder. The `load.go` or `buffered_queue.go`
 will start a web server that will display performance stats under `http://localhost:9999/stats`.
