@@ -2,7 +2,7 @@ package redismq
 
 import (
 	"fmt"
-	"github.com/adeven/redis"
+	"github.com/adjust/redis"
 	"strconv"
 	"time"
 )

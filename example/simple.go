@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/adeven/redismq"
+	"github.com/adjust/redismq"
 )
 
 func main() {

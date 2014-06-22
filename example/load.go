@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/adeven/redismq"
+	"github.com/adjust/redismq"
 	"log"
 	"math/rand"
 	"runtime"

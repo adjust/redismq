@@ -12,5 +12,5 @@ services:
 script: go test -v
 
 install:
-  - go get -u github.com/adeven/redis
+  - go get -u github.com/adjust/redis
   - go get -u github.com/matttproud/gocheck

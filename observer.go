@@ -3,7 +3,7 @@ package redismq
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/adeven/redis"
+	"github.com/adjust/redis"
 	"log"
 	"strconv"
 	"time"
