@@ -117,7 +117,7 @@ func (queue *BufferedQueue) startHeartbeat() {
 	go func() {
 		firstRun := true
 		for {
-			queue.redisClient.SetEx(queueHeartbeatKey(queue.Name), 1, "ping")
+			queue.redisClient.SetEx(queueHeartbeatKey(queue.Name), time.Second, "ping")
 			if firstRun {
 				firstWrite <- true
 				firstRun = false

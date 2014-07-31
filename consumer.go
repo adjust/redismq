@@ -2,8 +2,9 @@ package redismq
 
 import (
 	"fmt"
-	"github.com/adjust/redis"
 	"time"
+
+	"gopkg.in/redis.v2"
 )
 
 // Consumer are used for reading from queues
@@ -16,7 +17,10 @@ type Consumer struct {
 func (queue *Queue) AddConsumer(name string) (c *Consumer, err error) {
 	c = &Consumer{Name: name, Queue: queue}
 	//check uniqueness and start heartbeat
-	added := queue.redisClient.SAdd(queueWorkersKey(queue.Name), name).Val()
+	added, err := queue.redisClient.SAdd(queueWorkersKey(queue.Name), name).Result()
+	if err != nil {
+		return nil, err
+	}
 	if added == 0 {
 		if queue.isActiveConsumer(name) {
 			return nil, fmt.Errorf("consumer with this name is already active")
@@ -61,7 +65,7 @@ func (consumer *Consumer) MultiGet(length int) ([]*Package, error) {
 	}
 
 	// TODO maybe use transactions for rollback in case of errors?
-	reqs, err := consumer.Queue.redisClient.Pipelined(func(c *redis.PipelineClient) {
+	reqs, err := consumer.Queue.redisClient.Pipelined(func(c *redis.Pipeline) error {
 		c.BRPopLPush(
 			queueInputKey(consumer.Queue.Name),
 			consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
@@ -73,17 +77,15 @@ func (consumer *Consumer) MultiGet(length int) ([]*Package, error) {
 				consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
 			)
 		}
-
+		return nil
 	})
-	if err != nil {
+	if err != nil && err != redis.Nil {
 		return nil, err
 	}
 
 	for _, answer := range reqs {
 		switch answer := answer.(type) {
-		default:
-			return nil, err
-		case *redis.StringReq:
+		case *redis.StringCmd:
 			if answer.Val() == "" {
 				continue
 			}
@@ -93,6 +95,8 @@ func (consumer *Consumer) MultiGet(length int) ([]*Package, error) {
 			}
 			p.Collection = &collection
 			collection = append(collection, p)
+		default:
+			return nil, err
 		}
 	}
 	consumer.Queue.incrRate(
@@ -125,8 +129,7 @@ func (consumer *Consumer) HasUnacked() bool {
 
 // GetUnackedLength returns the number of packages in the unacked queue
 func (consumer *Consumer) GetUnackedLength() int64 {
-	l := consumer.Queue.redisClient.LLen(consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name))
-	return l.Val()
+	return consumer.Queue.redisClient.LLen(consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name)).Val()
 }
 
 // GetFailed returns a single packages from the failed queue of this consumer
@@ -144,8 +147,7 @@ func (consumer *Consumer) GetFailed() (*Package, error) {
 
 // ResetWorking deletes! all messages in the working queue of this consumer
 func (consumer *Consumer) ResetWorking() error {
-	answer := consumer.Queue.redisClient.Del(consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name))
-	return answer.Err()
+	return consumer.Queue.redisClient.Del(consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name)).Err()
 }
 
 // RequeueWorking requeues all packages from working to input
@@ -161,8 +163,7 @@ func (consumer *Consumer) RequeueWorking() error {
 }
 
 func (consumer *Consumer) ackPackage(p *Package) error {
-	answer := consumer.Queue.redisClient.RPop(consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name))
-	return answer.Err()
+	return consumer.Queue.redisClient.RPop(consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name)).Err()
 }
 
 func (consumer *Consumer) requeuePackage(p *Package) error {
@@ -175,11 +176,10 @@ func (consumer *Consumer) requeuePackage(p *Package) error {
 }
 
 func (consumer *Consumer) failPackage(p *Package) error {
-	answer := consumer.Queue.redisClient.RPopLPush(
+	return consumer.Queue.redisClient.RPopLPush(
 		consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
 		queueFailedKey(consumer.Queue.Name),
-	)
-	return answer.Err()
+	).Err()
 }
 
 func (consumer *Consumer) startHeartbeat() {
@@ -189,7 +189,7 @@ func (consumer *Consumer) startHeartbeat() {
 		for {
 			consumer.Queue.redisClient.SetEx(
 				consumerHeartbeatKey(consumer.Queue.Name, consumer.Name),
-				1,
+				time.Second,
 				"ping",
 			)
 			if firstRun {
@@ -203,7 +203,7 @@ func (consumer *Consumer) startHeartbeat() {
 	return
 }
 
-func (consumer *Consumer) parseRedisAnswer(answer *redis.StringReq) (*Package, error) {
+func (consumer *Consumer) parseRedisAnswer(answer *redis.StringCmd) (*Package, error) {
 	if answer.Err() != nil {
 		return nil, answer.Err()
 	}

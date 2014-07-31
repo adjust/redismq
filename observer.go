@@ -3,10 +3,11 @@ package redismq
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/adjust/redis"
 	"log"
 	"strconv"
 	"time"
+
+	"gopkg.in/redis.v2"
 )
 
 // Observer is a very simple implementation of an statistics observer
@@ -59,7 +60,11 @@ func NewObserver(redisHost, redisPort, redisPassword string, redisDb int64) *Obs
 		redisDb:       redisDb,
 		Stats:         make(map[string]*QueueStat),
 	}
-	q.redisClient = redis.NewTCPClient(redisHost+":"+redisPort, redisPassword, redisDb)
+	q.redisClient = redis.NewTCPClient(&redis.Options{
+		Addr:     redisHost + ":" + redisPort,
+		Password: redisPassword,
+		DB:       redisDb,
+	})
 	return q
 }
 
@@ -77,13 +82,11 @@ func (observer *Observer) UpdateAllStats() {
 
 // GetAllQueues returns a list of all registed queues
 func (observer *Observer) GetAllQueues() (queues []string, err error) {
-	answer := observer.redisClient.SMembers(masterQueueKey())
-	return answer.Val(), answer.Err()
+	return observer.redisClient.SMembers(masterQueueKey()).Result()
 }
 
 func (observer *Observer) getConsumers(queue string) (consumers []string, err error) {
-	answer := observer.redisClient.SMembers(queueWorkersKey(queue))
-	return answer.Val(), answer.Err()
+	return observer.redisClient.SMembers(queueWorkersKey(queue)).Result()
 }
 
 // UpdateQueueStats fetches stats for one specific queue and its consumers
@@ -140,13 +143,13 @@ func (observer *Observer) fetchStat(keyName string, seconds int64) int64 {
 		keys = append(keys, key)
 		now--
 	}
-	answer := observer.redisClient.MGet(keys...)
-	if answer.Err() != nil {
+	vals, err := observer.redisClient.MGet(keys...).Result()
+	if err != nil {
 		return 0
 	}
 	nilVal := 0
 	sum := int64(0)
-	for _, val := range answer.Val() {
+	for _, val := range vals {
 		if val == nil {
 			nilVal++
 			continue
