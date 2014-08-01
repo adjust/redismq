@@ -1,13 +1,13 @@
 package redismq
 
 import (
-	// "fmt"
-	"github.com/adjust/redis"
-	. "github.com/matttproud/gocheck"
 	"math/rand"
 	"runtime"
 	"testing"
 	"time"
+
+	. "github.com/matttproud/gocheck"
+	"gopkg.in/redis.v2"
 )
 
 func Test(t *testing.T) { TestingT(t) }
@@ -29,11 +29,15 @@ var (
 func (suite *TestSuite) SetUpSuite(c *C) {
 	runtime.GOMAXPROCS(8)
 	rand.Seed(time.Now().UTC().UnixNano())
-	suite.redisClient = redis.NewTCPClient(redisHost+":"+redisPort, redisPassword, redisDB)
+	suite.redisClient = redis.NewTCPClient(&redis.Options{
+		Addr:     redisHost + ":" + redisPort,
+		Password: redisPassword,
+		DB:       redisDB,
+	})
 }
 
 func (suite *TestSuite) SetUpTest(c *C) {
-	suite.redisClient.FlushDb()
+	c.Assert(suite.redisClient.FlushDb().Err(), IsNil)
 	suite.queue = CreateQueue(redisHost, redisPort, redisPassword, redisDB, "teststuff")
 	suite.consumer, _ = suite.queue.AddConsumer("testconsumer")
 }

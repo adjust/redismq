@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/adjust/redismq"
 	"log"
 	"math/rand"
 	"runtime"
+
+	"github.com/adjust/redismq"
 )
 
 // This example demonstrates maximum performance

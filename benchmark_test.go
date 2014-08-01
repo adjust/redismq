@@ -2,12 +2,13 @@ package redismq
 
 import (
 	//"fmt"
-	. "github.com/matttproud/gocheck"
 	"math/rand"
 	"runtime"
 	"strconv"
 	"sync"
 	"time"
+
+	. "github.com/matttproud/gocheck"
 )
 
 type BenchmarkSuite struct {
@@ -112,11 +113,11 @@ func (suite *BenchmarkSuite) BenchmarkFourPub1k(c *C) {
 	payload := randomString(1024)
 	for i := 0; i < c.N; i++ {
 		for _, c := range suite.mutliConsumer1k {
-			go func(consumer *Consumer) {
-				consumer.Queue.Put(payload)
-				defer wg.Done()
-			}(c)
 			wg.Add(1)
+			go func(consumer *Consumer) {
+				defer wg.Done()
+				consumer.Queue.Put(payload)
+			}(c)
 		}
 		wg.Wait()
 	}
@@ -127,12 +128,12 @@ func (suite *BenchmarkSuite) BenchmarkFourCon1k(c *C) {
 	var wg sync.WaitGroup
 	for i := 0; i < c.N; i++ {
 		for _, c := range suite.mutliConsumer1k {
+			wg.Add(1)
 			go func(consumer *Consumer) {
+				defer wg.Done()
 				p, _ := consumer.Get()
 				p.Ack()
-				defer wg.Done()
 			}(c)
-			wg.Add(1)
 		}
 		wg.Wait()
 	}
@@ -144,11 +145,11 @@ func (suite *BenchmarkSuite) BenchmarkFourPub4k(c *C) {
 	payload := randomString(1024)
 	for i := 0; i < c.N; i++ {
 		for _, c := range suite.mutliConsumer4k {
-			go func(consumer *Consumer) {
-				consumer.Queue.Put(payload)
-				defer wg.Done()
-			}(c)
 			wg.Add(1)
+			go func(consumer *Consumer) {
+				defer wg.Done()
+				consumer.Queue.Put(payload)
+			}(c)
 		}
 		wg.Wait()
 	}
@@ -159,12 +160,12 @@ func (suite *BenchmarkSuite) BenchmarkFourCon4k(c *C) {
 	var wg sync.WaitGroup
 	for i := 0; i < c.N; i++ {
 		for _, c := range suite.mutliConsumer4k {
+			wg.Add(1)
 			go func(consumer *Consumer) {
+				defer wg.Done()
 				p, _ := consumer.Get()
 				p.Ack()
-				defer wg.Done()
 			}(c)
-			wg.Add(1)
 		}
 		wg.Wait()
 	}
@@ -179,14 +180,14 @@ func (suite *BenchmarkSuite) BenchmarkSingPubSingCon1k(c *C) {
 	for i := 0; i < c.N; i++ {
 		wg.Add(1)
 		go func() {
-			suite.queue1k.Put(payload)
 			defer wg.Done()
+			suite.queue1k.Put(payload)
 		}()
 		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			p, _ := suite.consumer1k.Get()
 			p.Ack()
-			defer wg.Done()
 		}()
 		wg.Wait()
 	}
@@ -201,14 +202,14 @@ func (suite *BenchmarkSuite) BenchmarkSingPubSingCon4k(c *C) {
 	for i := 0; i < c.N; i++ {
 		wg.Add(1)
 		go func() {
-			suite.queue4k.Put(payload)
 			defer wg.Done()
+			suite.queue4k.Put(payload)
 		}()
 		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			p, _ := suite.consumer4k.Get()
 			p.Ack()
-			defer wg.Done()
 		}()
 		wg.Wait()
 	}
@@ -221,21 +222,20 @@ func (suite *BenchmarkSuite) BenchmarkFourPubFourCon1k(c *C) {
 
 	for i := 0; i < c.N; i++ {
 		for _, c := range suite.mutliConsumer1k {
-			go func(consumer *Consumer) {
-				consumer.Queue.Put(payload)
-				defer wg.Done()
-			}(c)
 			wg.Add(1)
+			go func(consumer *Consumer) {
+				defer wg.Done()
+				consumer.Queue.Put(payload)
+			}(c)
 		}
 		for _, c := range suite.mutliConsumer1k {
+			wg.Add(1)
 			go func(consumer *Consumer) {
+				defer wg.Done()
 				p, _ := consumer.Get()
 				p.Ack()
-				defer wg.Done()
 			}(c)
-			wg.Add(1)
 		}
-
 		wg.Wait()
 	}
 }
@@ -247,21 +247,20 @@ func (suite *BenchmarkSuite) BenchmarkFourPubFourCon4k(c *C) {
 
 	for i := 0; i < c.N; i++ {
 		for _, c := range suite.mutliConsumer4k {
-			go func(consumer *Consumer) {
-				consumer.Queue.Put(payload)
-				defer wg.Done()
-			}(c)
 			wg.Add(1)
+			go func(consumer *Consumer) {
+				defer wg.Done()
+				consumer.Queue.Put(payload)
+			}(c)
 		}
 		for _, c := range suite.mutliConsumer4k {
+			wg.Add(1)
 			go func(consumer *Consumer) {
+				defer wg.Done()
 				p, _ := consumer.Get()
 				p.Ack()
-				defer wg.Done()
 			}(c)
-			wg.Add(1)
 		}
-
 		wg.Wait()
 	}
 }

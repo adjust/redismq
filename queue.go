@@ -2,9 +2,10 @@ package redismq
 
 import (
 	"fmt"
-	"github.com/adjust/redis"
 	"strconv"
 	"time"
+
+	"gopkg.in/redis.v2"
 )
 
 // Queue is the central element of this library.
@@ -32,12 +33,18 @@ func CreateQueue(redisHost, redisPort, redisPassword string, redisDB int64, name
 
 // SelectQueue returns a Queue if a queue with the name exists
 func SelectQueue(redisHost, redisPort, redisPassword string, redisDB int64, name string) (queue *Queue, err error) {
-
-	redisClient := redis.NewTCPClient(redisHost+":"+redisPort, redisPassword, redisDB)
-	answer := redisClient.SIsMember(masterQueueKey(), name)
+	redisClient := redis.NewTCPClient(&redis.Options{
+		Addr:     redisHost + ":" + redisPort,
+		Password: redisPassword,
+		DB:       redisDB,
+	})
 	defer redisClient.Close()
 
-	if answer.Val() == false {
+	isMember, err := redisClient.SIsMember(masterQueueKey(), name).Result()
+	if err != nil {
+		return nil, err
+	}
+	if !isMember {
 		return nil, fmt.Errorf("queue with this name doesn't exist")
 	}
 
@@ -46,7 +53,11 @@ func SelectQueue(redisHost, redisPort, redisPassword string, redisDB int64, name
 
 func newQueue(redisHost, redisPort, redisPassword string, redisDB int64, name string) *Queue {
 	q := &Queue{Name: name}
-	q.redisClient = redis.NewTCPClient(redisHost+":"+redisPort, redisPassword, redisDB)
+	q.redisClient = redis.NewTCPClient(&redis.Options{
+		Addr:     redisHost + ":" + redisPort,
+		Password: redisPassword,
+		DB:       redisDB,
+	})
 	q.redisClient.SAdd(masterQueueKey(), name)
 	q.startStatsWriter()
 	return q
@@ -75,7 +86,10 @@ func (queue *Queue) Delete() error {
 			return err
 		}
 
-		queue.redisClient.SRem(queueWorkersKey(queue.Name), name).Val()
+		err = queue.redisClient.SRem(queueWorkersKey(queue.Name), name).Err()
+		if err != nil {
+			return err
+		}
 	}
 
 	err = queue.ResetInput()
@@ -88,19 +102,26 @@ func (queue *Queue) Delete() error {
 		return err
 	}
 
-	queue.redisClient.SRem(masterQueueKey(), queue.Name)
-	queue.redisClient.Del(queueWorkersKey(queue.Name))
+	err = queue.redisClient.SRem(masterQueueKey(), queue.Name).Err()
+	if err != nil {
+		return err
+	}
+	err = queue.redisClient.Del(queueWorkersKey(queue.Name)).Err()
+	if err != nil {
+		return err
+	}
 
-	err = queue.redisClient.Close()
-	return err
+	queue.redisClient.Close()
+
+	return nil
 }
 
 // Put writes the payload into the input queue
 func (queue *Queue) Put(payload string) error {
 	p := &Package{CreatedAt: time.Now(), Payload: payload, Queue: queue}
-	answer := queue.redisClient.LPush(queueInputKey(queue.Name), p.getString())
+	lpush := queue.redisClient.LPush(queueInputKey(queue.Name), p.getString())
 	queue.incrRate(queueInputRateKey(queue.Name), 1)
-	return answer.Err()
+	return lpush.Err()
 }
 
 // RequeueFailed moves all failed packages back to the input queue
@@ -108,9 +129,9 @@ func (queue *Queue) RequeueFailed() error {
 	l := queue.GetFailedLength()
 	// TODO implement this in lua
 	for l > 0 {
-		answer := queue.redisClient.RPopLPush(queueFailedKey(queue.Name), queueInputKey(queue.Name))
-		if answer.Err() != nil {
-			return answer.Err()
+		err := queue.redisClient.RPopLPush(queueFailedKey(queue.Name), queueInputKey(queue.Name)).Err()
+		if err != nil {
+			return err
 		}
 		queue.incrRate(queueInputRateKey(queue.Name), 1)
 		l--
@@ -120,31 +141,26 @@ func (queue *Queue) RequeueFailed() error {
 
 // ResetInput deletes all packages from the input queue
 func (queue *Queue) ResetInput() error {
-	answer := queue.redisClient.Del(queueInputKey(queue.Name))
-	return answer.Err()
+	return queue.redisClient.Del(queueInputKey(queue.Name)).Err()
 }
 
 // ResetFailed deletes all packages from the failed queue
 func (queue *Queue) ResetFailed() error {
-	answer := queue.redisClient.Del(queueFailedKey(queue.Name))
-	return answer.Err()
+	return queue.redisClient.Del(queueFailedKey(queue.Name)).Err()
 }
 
 // GetInputLength returns the number of packages in the input queue
 func (queue *Queue) GetInputLength() int64 {
-	l := queue.redisClient.LLen(queueInputKey(queue.Name))
-	return l.Val()
+	return queue.redisClient.LLen(queueInputKey(queue.Name)).Val()
 }
 
 // GetFailedLength returns the number of packages in the failed queue
 func (queue *Queue) GetFailedLength() int64 {
-	l := queue.redisClient.LLen(queueFailedKey(queue.Name))
-	return l.Val()
+	return queue.redisClient.LLen(queueFailedKey(queue.Name)).Val()
 }
 
 func (queue *Queue) getConsumers() (consumers []string, err error) {
-	answer := queue.redisClient.SMembers(queueWorkersKey(queue.Name))
-	return answer.Val(), answer.Err()
+	return queue.redisClient.SMembers(queueWorkersKey(queue.Name)).Result()
 }
 
 func (queue *Queue) incrRate(name string, value int64) {
@@ -184,13 +200,13 @@ func (queue *Queue) writeStatsCacheToRedis(now int64) {
 			// incrby can handle the situation where multiple inputs are counted
 			queue.redisClient.IncrBy(key, value)
 			// save stats to redis with 2h expiration
-			queue.redisClient.Expire(key, 7200)
+			queue.redisClient.Expire(key, 2*time.Hour)
 		}
 		// track queue lengths
 		inputKey := fmt.Sprintf("%s::%d", queueInputSizeKey(queue.Name), now)
 		failKey := fmt.Sprintf("%s::%d", queueFailedSizeKey(queue.Name), now)
-		queue.redisClient.SetEx(inputKey, 7200, strconv.FormatInt(queue.GetInputLength(), 10))
-		queue.redisClient.SetEx(failKey, 7200, strconv.FormatInt(queue.GetFailedLength(), 10))
+		queue.redisClient.SetEx(inputKey, 2*time.Hour, strconv.FormatInt(queue.GetInputLength(), 10))
+		queue.redisClient.SetEx(failKey, 2*time.Hour, strconv.FormatInt(queue.GetFailedLength(), 10))
 
 		delete(queue.rateStatsCache, sec)
 	}
@@ -199,8 +215,5 @@ func (queue *Queue) writeStatsCacheToRedis(now int64) {
 
 func (queue *Queue) isActiveConsumer(name string) bool {
 	val := queue.redisClient.Get(consumerHeartbeatKey(queue.Name, name)).Val()
-	if val == "ping" {
-		return true
-	}
-	return false
+	return val == "ping"
 }
