@@ -31,11 +31,11 @@ func (queue *Queue) AddConsumer(name string) (c *Consumer, err error) {
 }
 
 // Get returns a single package from the queue (blocking)
-func (consumer *Consumer) Get() (*Package, error) {
+func (consumer *Consumer) Get(timeout time.Duration) (*Package, error) {
 	if consumer.HasUnacked() {
 		return nil, fmt.Errorf("unacked Packages found")
 	}
-	return consumer.unsafeGet()
+	return consumer.unsafeGet(timeout)
 }
 
 // NoWaitGet returns a single package from the queue (returns nil, nil if no package in queue)
@@ -58,7 +58,7 @@ func (consumer *Consumer) NoWaitGet() (*Package, error) {
 }
 
 // MultiGet returns an array of packages from the queue
-func (consumer *Consumer) MultiGet(length int) ([]*Package, error) {
+func (consumer *Consumer) MultiGet(length int, timeout time.Duration) ([]*Package, error) {
 	var collection []*Package
 	if consumer.HasUnacked() {
 		return nil, fmt.Errorf("unacked Packages found")
@@ -69,7 +69,7 @@ func (consumer *Consumer) MultiGet(length int) ([]*Package, error) {
 		c.BRPopLPush(
 			queueInputKey(consumer.Queue.Name),
 			consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
-			0,
+			int64(timeout/time.Second),
 		)
 		for i := 1; i < length; i++ {
 			c.RPopLPush(
@@ -214,11 +214,11 @@ func (consumer *Consumer) parseRedisAnswer(answer *redis.StringCmd) (*Package, e
 	return p, nil
 }
 
-func (consumer *Consumer) unsafeGet() (*Package, error) {
+func (consumer *Consumer) unsafeGet(timeout time.Duration) (*Package, error) {
 	answer := consumer.Queue.redisClient.BRPopLPush(
 		queueInputKey(consumer.Queue.Name),
 		consumerWorkingQueueKey(consumer.Queue.Name, consumer.Name),
-		0,
+		int64(timeout/time.Second),
 	)
 	consumer.Queue.incrRate(
 		consumerWorkingRateKey(consumer.Queue.Name, consumer.Name),
