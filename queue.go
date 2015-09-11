@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"gopkg.in/redis.v2"
+	"gopkg.in/redis.v3"
 )
 
 // Queue is the central element of this library.
@@ -33,7 +33,7 @@ func CreateQueue(redisHost, redisPort, redisPassword string, redisDB int64, name
 
 // SelectQueue returns a Queue if a queue with the name exists
 func SelectQueue(redisHost, redisPort, redisPassword string, redisDB int64, name string) (queue *Queue, err error) {
-	redisClient := redis.NewTCPClient(&redis.Options{
+	redisClient := redis.NewClient(&redis.Options{
 		Addr:     redisHost + ":" + redisPort,
 		Password: redisPassword,
 		DB:       redisDB,
@@ -53,7 +53,7 @@ func SelectQueue(redisHost, redisPort, redisPassword string, redisDB int64, name
 
 func newQueue(redisHost, redisPort, redisPassword string, redisDB int64, name string) *Queue {
 	q := &Queue{Name: name}
-	q.redisClient = redis.NewTCPClient(&redis.Options{
+	q.redisClient = redis.NewClient(&redis.Options{
 		Addr:     redisHost + ":" + redisPort,
 		Password: redisPassword,
 		DB:       redisDB,
@@ -205,8 +205,8 @@ func (queue *Queue) writeStatsCacheToRedis(now int64) {
 		// track queue lengths
 		inputKey := fmt.Sprintf("%s::%d", queueInputSizeKey(queue.Name), now)
 		failKey := fmt.Sprintf("%s::%d", queueFailedSizeKey(queue.Name), now)
-		queue.redisClient.SetEx(inputKey, 2*time.Hour, strconv.FormatInt(queue.GetInputLength(), 10))
-		queue.redisClient.SetEx(failKey, 2*time.Hour, strconv.FormatInt(queue.GetFailedLength(), 10))
+		queue.redisClient.Set(inputKey, strconv.FormatInt(queue.GetInputLength(), 10), 2*time.Hour)
+		queue.redisClient.Set(failKey, strconv.FormatInt(queue.GetFailedLength(), 10), 2*time.Hour)
 
 		delete(queue.rateStatsCache, sec)
 	}
@@ -215,19 +215,19 @@ func (queue *Queue) writeStatsCacheToRedis(now int64) {
 
 // AddConsumer returns a conumser that can write from the queue
 func (queue *Queue) AddConsumer(name string) (c *Consumer, err error) {
-        c = &Consumer{Name: name, Queue: queue}
-        //check uniqueness and start heartbeat
-        added, err := queue.redisClient.SAdd(queueWorkersKey(queue.Name), name).Result()
-        if err != nil {
-                return nil, err
-        }
-        if added == 0 {
-                if queue.isActiveConsumer(name) {
-                        return nil, fmt.Errorf("consumer with this name is already active")
-                }
-        }
-        c.startHeartbeat()
-        return c, nil
+	c = &Consumer{Name: name, Queue: queue}
+	//check uniqueness and start heartbeat
+	added, err := queue.redisClient.SAdd(queueWorkersKey(queue.Name), name).Result()
+	if err != nil {
+		return nil, err
+	}
+	if added == 0 {
+		if queue.isActiveConsumer(name) {
+			return nil, fmt.Errorf("consumer with this name is already active")
+		}
+	}
+	c.startHeartbeat()
+	return c, nil
 }
 
 func (queue *Queue) isActiveConsumer(name string) bool {

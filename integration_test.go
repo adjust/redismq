@@ -7,7 +7,7 @@ import (
 	"time"
 
 	. "github.com/matttproud/gocheck"
-	"gopkg.in/redis.v2"
+	"gopkg.in/redis.v3"
 )
 
 func Test(t *testing.T) { TestingT(t) }
@@ -29,7 +29,7 @@ var (
 func (suite *TestSuite) SetUpSuite(c *C) {
 	runtime.GOMAXPROCS(8)
 	rand.Seed(time.Now().UTC().UnixNano())
-	suite.redisClient = redis.NewTCPClient(&redis.Options{
+	suite.redisClient = redis.NewClient(&redis.Options{
 		Addr:     redisHost + ":" + redisPort,
 		Password: redisPassword,
 		DB:       redisDB,
