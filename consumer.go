@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"gopkg.in/redis.v2"
+	"gopkg.in/redis.v3"
 )
 
 // Consumer are used for reading from queues
@@ -170,10 +170,10 @@ func (consumer *Consumer) startHeartbeat() {
 	go func() {
 		firstRun := true
 		for {
-			consumer.Queue.redisClient.SetEx(
+			consumer.Queue.redisClient.Set(
 				consumerHeartbeatKey(consumer.Queue.Name, consumer.Name),
-				time.Second,
 				"ping",
+				time.Second,
 			)
 			if firstRun {
 				firstWrite <- true

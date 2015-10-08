@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"gopkg.in/redis.v2"
+	"gopkg.in/redis.v3"
 )
 
 // Observer is a very simple implementation of an statistics observer
@@ -60,7 +60,7 @@ func NewObserver(redisHost, redisPort, redisPassword string, redisDb int64) *Obs
 		redisDb:       redisDb,
 		Stats:         make(map[string]*QueueStat),
 	}
-	q.redisClient = redis.NewTCPClient(&redis.Options{
+	q.redisClient = redis.NewClient(&redis.Options{
 		Addr:     redisHost + ":" + redisPort,
 		Password: redisPassword,
 		DB:       redisDb,
