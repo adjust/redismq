@@ -11,6 +11,7 @@ import (
 type Consumer struct {
 	Name  string
 	Queue *Queue
+	Running bool
 }
 
 // Get returns a single package from the queue (blocking)
@@ -169,7 +170,7 @@ func (consumer *Consumer) startHeartbeat() {
 	firstWrite := make(chan bool, 1)
 	go func() {
 		firstRun := true
-		for {
+		for consumer.Running {
 			consumer.Queue.redisClient.Set(
 				consumerHeartbeatKey(consumer.Queue.Name, consumer.Name),
 				"ping",
@@ -184,6 +185,11 @@ func (consumer *Consumer) startHeartbeat() {
 	}()
 	<-firstWrite
 	return
+}
+
+func (consumer *Consumer) Stop() {
+	consumer.RequeueWorking()
+	consumer.Running = false
 }
 
 func (consumer *Consumer) parseRedisAnswer(answer *redis.StringCmd) (*Package, error) {

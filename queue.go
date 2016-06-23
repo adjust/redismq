@@ -215,7 +215,7 @@ func (queue *Queue) writeStatsCacheToRedis(now int64) {
 
 // AddConsumer returns a conumser that can write from the queue
 func (queue *Queue) AddConsumer(name string) (c *Consumer, err error) {
-	c = &Consumer{Name: name, Queue: queue}
+	c = &Consumer{Name: name, Queue: queue, Running: true}
 	//check uniqueness and start heartbeat
 	added, err := queue.redisClient.SAdd(queueWorkersKey(queue.Name), name).Result()
 	if err != nil {

@@ -1,11 +1,12 @@
-package main
+// +build main1
+package example
 
 import (
 	"log"
 	"math/rand"
 	"runtime"
 
-	"github.com/adjust/redismq"
+	"github.com/iain17/redismq"
 )
 
 // This example demonstrates maximum performance
