@@ -1,7 +1,8 @@
-package main
+// +build main1
+package example
 
 import (
-	"github.com/adjust/redismq"
+	"github.com/iain17/redismq"
 	"log"
 	"math/rand"
 	"runtime"
@@ -11,11 +12,12 @@ func main() {
 	runtime.GOMAXPROCS(5)
 	server := redismq.NewServer("localhost", "6379", "", 9, "9999")
 	server.Start()
-	queue := redismq.CreateQueue("localhost", "6379", "", 9, "example")
-	go write(queue)
-	go read(queue, "1")
-	go read(queue, "2")
-	go read(queue, "3")
+	go write("example")
+	go write("example")
+
+	go read("example", "1")
+	go read("example", "2")
+
 	select {}
 }
 
@@ -31,25 +33,27 @@ func randInt(min int, max int) int {
 	return min + rand.Intn(max-min)
 }
 
-func write(queue *redismq.Queue) {
+func write(queue string) {
+	testQueue := redismq.CreateQueue("localhost:6379", "", 9, queue)
 	payload := randomString(1024 * 1) //adjust for size
 	for {
-		queue.Put(payload)
+		testQueue.Put(payload)
 	}
 }
 
-func read(queue *redismq.Queue, prefix string) {
-	consumer, err := queue.AddConsumer("testconsumer" + prefix)
+func read(queue, prefix string) {
+	testQueue := redismq.CreateQueue("localhost:6379", "", 9, queue)
+	consumer, err := testQueue.AddConsumer("testconsumer" + prefix)
 	if err != nil {
 		panic(err)
 	}
 	consumer.ResetWorking()
 	for {
-		p, err := consumer.Get()
+		p, err := consumer.MultiGet(200)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		err = p.Ack()
+		p[len(p)-1].MultiAck()
 	}
 }

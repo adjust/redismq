@@ -1,8 +1,9 @@
-package main
+// +build main1
+package example
 
 import (
 	"fmt"
-	"github.com/adjust/redismq"
+	"github.com/iain17/redismq"
 )
 
 func main() {
