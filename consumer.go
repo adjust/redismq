@@ -1,6 +1,7 @@
 package redismq
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -11,6 +12,9 @@ import (
 type Consumer struct {
 	Name  string
 	Queue *Queue
+
+	cancel         context.CancelFunc
+	contextCleared <-chan struct{}
 }
 
 // Get returns a single package from the queue (blocking)
@@ -166,7 +170,14 @@ func (consumer *Consumer) failPackage(p *Package) error {
 }
 
 func (consumer *Consumer) startHeartbeat() {
-	firstWrite := make(chan bool, 1)
+	firstWrite := make(chan struct{}, 1)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	consumer.cancel = cancel
+
+	waitForClear := make(chan struct{}, 1)
+	consumer.contextCleared = waitForClear
+
 	go func() {
 		firstRun := true
 		for {
@@ -176,14 +187,34 @@ func (consumer *Consumer) startHeartbeat() {
 				time.Second,
 			)
 			if firstRun {
-				firstWrite <- true
+				// use close instead
+				close(firstWrite)
 				firstRun = false
 			}
-			time.Sleep(500 * time.Millisecond)
+			select {
+			case <-time.After(500 * time.Millisecond):
+			case <-ctx.Done():
+				// remove heart beat immediately
+				consumer.Queue.redisClient.Del(consumerHeartbeatKey(consumer.Queue.Name, consumer.Name))
+				close(waitForClear)
+				return
+			}
 		}
 	}()
 	<-firstWrite
 	return
+}
+
+func (consumer *Consumer) Quit() {
+	if consumer.cancel == nil {
+		return
+	}
+
+	consumer.cancel()
+	// wait until heart beat mark is removed
+	<-consumer.contextCleared
+
+	consumer.cancel = nil
 }
 
 func (consumer *Consumer) parseRedisAnswer(answer *redis.StringCmd) (*Package, error) {
