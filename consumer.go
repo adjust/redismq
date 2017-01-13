@@ -187,7 +187,8 @@ func (consumer *Consumer) startHeartbeat() {
 				time.Second,
 			)
 			if firstRun {
-				firstWrite <- struct{}{}
+				// use close instead
+				close(firstWrite)
 				firstRun = false
 			}
 			select {
