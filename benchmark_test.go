@@ -78,7 +78,7 @@ func (suite *BenchmarkSuite) BenchmarkSinglePub1k(c *C) {
 //benchmark single consumer 1k payload
 func (suite *BenchmarkSuite) BenchmarkSingleCon1k(c *C) {
 	for i := 0; i < c.N; i++ {
-		p, _ := suite.consumer1k.Get()
+		p, _ := suite.consumer1k.Get(0 * time.Second)
 		p.Ack()
 	}
 }
@@ -86,7 +86,7 @@ func (suite *BenchmarkSuite) BenchmarkSingleCon1k(c *C) {
 //benchmark single consumer multi 100 1k payload
 func (suite *BenchmarkSuite) BenchmarkSingleConMulti1k(c *C) {
 	for i := 0; i < c.N; i++ {
-		p, _ := suite.consumer1k.MultiGet(100)
+		p, _ := suite.consumer1k.MultiGet(100, 0)
 		p[99].MultiAck()
 	}
 }
@@ -102,7 +102,7 @@ func (suite *BenchmarkSuite) BenchmarkSinglePub4k(c *C) {
 //benchmark single consumer 4k payload
 func (suite *BenchmarkSuite) BenchmarkSingleCon4k(c *C) {
 	for i := 0; i < c.N; i++ {
-		p, _ := suite.consumer4k.Get()
+		p, _ := suite.consumer4k.Get(0 * time.Second)
 		p.Ack()
 	}
 }
@@ -131,7 +131,7 @@ func (suite *BenchmarkSuite) BenchmarkFourCon1k(c *C) {
 			wg.Add(1)
 			go func(consumer *Consumer) {
 				defer wg.Done()
-				p, _ := consumer.Get()
+				p, _ := consumer.Get(0 * time.Second)
 				p.Ack()
 			}(c)
 		}
@@ -163,7 +163,7 @@ func (suite *BenchmarkSuite) BenchmarkFourCon4k(c *C) {
 			wg.Add(1)
 			go func(consumer *Consumer) {
 				defer wg.Done()
-				p, _ := consumer.Get()
+				p, _ := consumer.Get(0 * time.Second)
 				p.Ack()
 			}(c)
 		}
@@ -186,7 +186,7 @@ func (suite *BenchmarkSuite) BenchmarkSingPubSingCon1k(c *C) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			p, _ := suite.consumer1k.Get()
+			p, _ := suite.consumer1k.Get(0 * time.Second)
 			p.Ack()
 		}()
 		wg.Wait()
@@ -208,7 +208,7 @@ func (suite *BenchmarkSuite) BenchmarkSingPubSingCon4k(c *C) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			p, _ := suite.consumer4k.Get()
+			p, _ := suite.consumer4k.Get(0 * time.Second)
 			p.Ack()
 		}()
 		wg.Wait()
@@ -232,7 +232,7 @@ func (suite *BenchmarkSuite) BenchmarkFourPubFourCon1k(c *C) {
 			wg.Add(1)
 			go func(consumer *Consumer) {
 				defer wg.Done()
-				p, _ := consumer.Get()
+				p, _ := consumer.Get(0 * time.Second)
 				p.Ack()
 			}(c)
 		}
@@ -257,7 +257,7 @@ func (suite *BenchmarkSuite) BenchmarkFourPubFourCon4k(c *C) {
 			wg.Add(1)
 			go func(consumer *Consumer) {
 				defer wg.Done()
-				p, _ := consumer.Get()
+				p, _ := consumer.Get(0 * time.Second)
 				p.Ack()
 			}(c)
 		}

@@ -59,7 +59,7 @@ func (suite *TestSuite) TestSelectQueue(c *C) {
 // should put package into queue
 func (suite *TestSuite) TestPutGetAndAck(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
-	p, err := suite.consumer.Get()
+	p, err := suite.consumer.Get(0 * time.Second)
 	c.Assert(err, Equals, nil)
 	c.Check(p.Payload, Equals, "testpayload")
 	c.Check(p.Ack(), Equals, nil)
@@ -79,23 +79,23 @@ func (suite *TestSuite) TestSecondGet(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 
-	p, err := suite.consumer.Get()
+	p, err := suite.consumer.Get(0 * time.Second)
 	c.Assert(err, Equals, nil)
 
-	_, err = suite.consumer.Get()
+	_, err = suite.consumer.Get(0 * time.Second)
 	c.Check(err, Not(Equals), nil)
 
 	err = p.Ack()
 	c.Check(err, Equals, nil)
 
-	_, err = suite.consumer.Get()
+	_, err = suite.consumer.Get(0 * time.Second)
 	c.Check(err, Equals, nil)
 }
 
 // test waiting for get
 func (suite *TestSuite) TestWaitForGet(c *C) {
 	go func() {
-		p, err := suite.consumer.Get()
+		p, err := suite.consumer.Get(0 * time.Second)
 		c.Assert(err, Equals, nil)
 		c.Check(p.Payload, Equals, "testpayload")
 	}()
@@ -108,7 +108,7 @@ func (suite *TestSuite) TestSecondConsumer(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 
-	p, err := suite.consumer.Get()
+	p, err := suite.consumer.Get(0 * time.Second)
 	c.Assert(err, Equals, nil)
 	c.Check(p.Payload, Equals, "testpayload")
 
@@ -116,7 +116,7 @@ func (suite *TestSuite) TestSecondConsumer(c *C) {
 	c.Assert(err, Equals, nil)
 	consumer.ResetWorking()
 
-	p2, err := consumer.Get()
+	p2, err := consumer.Get(0 * time.Second)
 	c.Assert(err, Equals, nil)
 	c.Check(p2.Payload, Equals, "testpayload")
 }
@@ -125,11 +125,11 @@ func (suite *TestSuite) TestSecondConsumer(c *C) {
 func (suite *TestSuite) TestRequeue(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 
-	p, err := suite.consumer.Get()
+	p, err := suite.consumer.Get(0 * time.Second)
 	c.Assert(err, Equals, nil)
 	c.Check(p.Requeue(), Equals, nil)
 
-	p2, err2 := suite.consumer.Get()
+	p2, err2 := suite.consumer.Get(0 * time.Second)
 	c.Assert(err2, Equals, nil)
 	c.Check(p2.Payload, Equals, "testpayload")
 }
@@ -138,7 +138,7 @@ func (suite *TestSuite) TestRequeue(c *C) {
 func (suite *TestSuite) TestFailed(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 
-	p, err := suite.consumer.Get()
+	p, err := suite.consumer.Get(0 * time.Second)
 	c.Assert(err, Equals, nil)
 	c.Check(p.Fail(), Equals, nil)
 
@@ -149,11 +149,11 @@ func (suite *TestSuite) TestFailed(c *C) {
 func (suite *TestSuite) TestGetUnacked(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 
-	_, err := suite.consumer.Get()
+	_, err := suite.consumer.Get(0 * time.Second)
 	c.Assert(err, Equals, nil)
 	// assume that consumer crashed and receives err on get
 
-	_, err = suite.consumer.Get()
+	_, err = suite.consumer.Get(0 * time.Second)
 	c.Assert(err, Not(Equals), nil)
 
 	p, err := suite.consumer.GetUnacked()
@@ -170,7 +170,7 @@ func (suite *TestSuite) TestRequeueFailed(c *C) {
 		c.Check(suite.queue.Put("testpayload"), Equals, nil)
 	}
 	for i := 0; i < 100; i++ {
-		p, err := suite.consumer.Get()
+		p, err := suite.consumer.Get(0 * time.Second)
 		c.Check(err, Equals, nil)
 		c.Check(p.Fail(), Equals, nil)
 	}
@@ -184,11 +184,11 @@ func (suite *TestSuite) TestRequeueFailed(c *C) {
 func (suite *TestSuite) TestRequeueWorkingManual(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 
-	_, err := suite.consumer.Get()
+	_, err := suite.consumer.Get(0 * time.Second)
 	c.Assert(err, Equals, nil)
 	// assume that consumer crashed and receives err on get
 
-	_, err = suite.consumer.Get()
+	_, err = suite.consumer.Get(0 * time.Second)
 	c.Assert(err, Not(Equals), nil)
 
 	p, err := suite.consumer.GetUnacked()
@@ -203,11 +203,11 @@ func (suite *TestSuite) TestRequeueWorkingManual(c *C) {
 func (suite *TestSuite) TestRequeueWorking(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 
-	_, err := suite.consumer.Get()
+	_, err := suite.consumer.Get(0 * time.Second)
 	c.Assert(err, Equals, nil)
 	// assume that consumer crashed and receives err on get
 
-	_, err = suite.consumer.Get()
+	_, err = suite.consumer.Get(0 * time.Second)
 	c.Assert(err, Not(Equals), nil)
 
 	err = suite.consumer.RequeueWorking()
@@ -221,7 +221,7 @@ func (suite *TestSuite) TestRequeueWorking(c *C) {
 func (suite *TestSuite) TestGetFailed(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 
-	p, err := suite.consumer.Get()
+	p, err := suite.consumer.Get(0 * time.Second)
 	c.Assert(err, Equals, nil)
 	c.Check(p.Fail(), Equals, nil)
 	c.Check(suite.queue.GetFailedLength(), Equals, int64(1))
@@ -250,11 +250,11 @@ func (suite *TestSuite) TestSecondQueue(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
 	c.Check(secondQueue.Put("testpayload2"), Equals, nil)
 
-	p, err := suite.consumer.Get()
+	p, err := suite.consumer.Get(0 * time.Second)
 	c.Assert(err, Equals, nil)
 	c.Check(p.Payload, Equals, "testpayload")
 
-	p2, err := secondConsumer.Get()
+	p2, err := secondConsumer.Get(0 * time.Second)
 	c.Assert(err, Equals, nil)
 	c.Check(p2.Payload, Equals, "testpayload2")
 
@@ -269,7 +269,7 @@ func (suite *TestSuite) TestHugePayload(c *C) {
 	payload := randomString(1024 * 1024 * 10)
 
 	c.Check(suite.queue.Put(payload), Equals, nil)
-	p, err := suite.consumer.Get()
+	p, err := suite.consumer.Get(0 * time.Second)
 	c.Assert(err, Equals, nil)
 	c.Check(p.Payload, Equals, payload)
 	c.Check(p.Ack(), Equals, nil)
@@ -283,7 +283,7 @@ func (suite *TestSuite) TestMultiGetAndAck(c *C) {
 	}
 	c.Check(suite.queue.GetInputLength(), Equals, int64(100))
 
-	p, err := suite.consumer.MultiGet(100)
+	p, err := suite.consumer.MultiGet(100, 0)
 	c.Assert(err, Equals, nil)
 	c.Check(suite.queue.GetInputLength(), Equals, int64(0))
 	c.Check(suite.consumer.GetUnackedLength(), Equals, int64(100))
@@ -302,7 +302,7 @@ func (suite *TestSuite) TestMultiGetAndPartialAck(c *C) {
 	}
 	c.Check(suite.queue.GetInputLength(), Equals, int64(100))
 
-	p, err := suite.consumer.MultiGet(100)
+	p, err := suite.consumer.MultiGet(100, 0)
 	c.Assert(err, Equals, nil)
 	c.Check(suite.queue.GetInputLength(), Equals, int64(0))
 	c.Check(suite.consumer.GetUnackedLength(), Equals, int64(100))
@@ -319,7 +319,7 @@ func (suite *TestSuite) TestMultiGetAndBlockedReject(c *C) {
 	for i := 0; i < 100; i++ {
 		c.Check(suite.queue.Put("testpayload"), Equals, nil)
 	}
-	p, err := suite.consumer.MultiGet(100)
+	p, err := suite.consumer.MultiGet(100, 0)
 	c.Assert(err, Equals, nil)
 	c.Check(p[49].Fail(), Not(Equals), nil)
 	c.Check(p[48].MultiAck(), Equals, nil)
@@ -332,7 +332,7 @@ func (suite *TestSuite) TestMultiGetAndMultiAck(c *C) {
 	for i := 0; i < 100; i++ {
 		c.Check(suite.queue.Put("testpayload"), Equals, nil)
 	}
-	p, err := suite.consumer.MultiGet(100)
+	p, err := suite.consumer.MultiGet(100, 0)
 	c.Assert(err, Equals, nil)
 	c.Check(p[49].MultiAck(), Equals, nil)
 	c.Check(suite.consumer.GetUnackedLength(), Equals, int64(50))
@@ -347,7 +347,7 @@ func (suite *TestSuite) TestMultiGetAndMultiAck(c *C) {
 // should not wait on multi get if less than requested amount of packages are in queue
 func (suite *TestSuite) TestMultiGetNoWait(c *C) {
 	c.Check(suite.queue.Put("testpayload"), Equals, nil)
-	p, err := suite.consumer.MultiGet(100)
+	p, err := suite.consumer.MultiGet(100, 0)
 	c.Assert(err, Equals, nil)
 	c.Check(p[len(p)-1].MultiAck(), Equals, nil)
 	c.Check(suite.consumer.HasUnacked(), Equals, false)
@@ -378,7 +378,7 @@ func (suite *TestSuite) TestBufferedQueue(c *C) {
 	c.Assert(err, Equals, nil)
 
 	for i := 0; i < 100; i++ {
-		p, err := consumer.Get()
+		p, err := consumer.Get(0 * time.Second)
 		c.Check(err, Equals, nil)
 		c.Check(p.Ack(), Equals, nil)
 	}
@@ -398,7 +398,7 @@ func (suite *TestSuite) TestBufferedQueueNoWait(c *C) {
 	consumer, err := q.AddConsumer("testconsumer")
 	c.Assert(err, Equals, nil)
 
-	p, err := consumer.Get()
+	p, err := consumer.Get(0 * time.Second)
 	c.Check(err, Equals, nil)
 	c.Check(p.Ack(), Equals, nil)
 
