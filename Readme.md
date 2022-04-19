@@ -6,7 +6,7 @@ Note: This project is no longer actively maintained. Please refer to its spiritu
 
 # redismq
 
-[![Build Status](https://secure.travis-ci.org/adjust/redismq.png)](http://travis-ci.org/adjust/redismq) [![godoc](http://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](https://godoc.org/github.com/adjust/redismq) 
+[![Build Status](https://secure.travis-ci.org/adjust/redismq.png)](http://travis-ci.org/adjust/redismq) [![godoc](http://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](https://godoc.org/github.com/adjust/redismq)
 
 ## What is this
 
@@ -172,7 +172,7 @@ As you can see there is also a command to get messages from the `Failed Queue`.
 ## How fast is it
 
 Even though the original implementation wasn't aiming for high speeds the addition of `BufferedQueues` and `MultiGet`
-make it go something like [this](http://www.youtube.com/watch?feature=player_detailpage&v=sGBMSLvggqA#t=58).
+make it go something like [this](https://youtu.be/g8nOci4Xhns?t=5).
 
 All of the following benchmarks were conducted on a MacBook Retina with a 2.4 GHz i7.
 The InputRate is the number of messages per second that get inserted, WorkRate the messages per second consumed.
